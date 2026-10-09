@@ -62,7 +62,13 @@ for (const c of comps) {
     ref, x: +((cx + ox * Math.cos(r) - oy * Math.sin(r)) * MM).toFixed(4), y: +((cy + ox * Math.sin(r) + oy * Math.cos(r)) * MM).toFixed(4),
     w: +w.toFixed(4), h: +h.toFixed(4), rot: odd ? 0 : rot, class: guess(ref, w * h),
     side: c.getState_Layer() === 2 ? 'bottom' : 'top', note: odd ? `rotation ${rot} deg: courtyard taken axis-aligned` : 'pads+' + margin,
+    ...(odd ? { rot_actual: rot } : {}),
   });
+}
+const seen = {};
+for (const p of parts) {                                    // empty or repeated designators get #2, #3 ...
+  seen[p.ref] = (seen[p.ref] || 0) + 1;
+  if (seen[p.ref] > 1) p.ref = `${p.ref}#${seen[p.ref]}`;
 }
 
 // board outline: lines, arcs and polylines on the outline layer

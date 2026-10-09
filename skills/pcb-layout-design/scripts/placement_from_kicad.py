@@ -146,9 +146,17 @@ def convert(text, grid=0.25, edge=0.5):
             notes.append(f"{ref}: rotation {rot:g} deg is not a 90 deg step, used its bounding box")
         part = {"ref": ref, "x": round(cx, 4), "y": round(cy, 4), "w": round(w, 4), "h": round(h, 4), "rot": prot,
                 "class": guess_class(ref, w * h), "side": side}
+        if prot == 0 and abs(rot / 90 - round(rot / 90)) >= 1e-6:
+            part["rot_actual"] = round(rot % 360, 3)        # baseline_diff.py compares this
         if src != "courtyard":
             part["note"] = src
         parts.append(part)
+    seen = {}
+    for p in parts:                                             # unannotated (REF**) or repeated refs get #2, #3 ...
+        seen[p["ref"]] = seen.get(p["ref"], 0) + 1
+        if seen[p["ref"]] > 1:
+            notes.append(f"{p['ref']}: repeated reference, renamed to {p['ref']}#{seen[p['ref']]}")
+            p["ref"] = f"{p['ref']}#{seen[p['ref']]}"
     if edges:
         X0, X1 = min(p[0] for p in edges), max(p[0] for p in edges)
         Y0, Y1 = min(-p[1] for p in edges), max(-p[1] for p in edges)

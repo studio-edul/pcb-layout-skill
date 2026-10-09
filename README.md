@@ -22,6 +22,7 @@ between the datasheet and the layout and does not trust the model's arithmetic:
 | **Before layout** | Block rules (decoupling, buck hot loop, crystal, motor driver, eFuse, connector ESD, USB-C, CAN) become numeric near / apart limits with rule IDs. `placement_check.py` must report ERROR 0 before coordinates go to the EDA tool. |
 | **During layout** | Trace width, via current, impedance, LDO heat and buck inductor from `pcbcalc.py`; every power path gets a rating table naming its weakest element. |
 | **After routing** | A post-route audit for what DRC cannot see: power left at signal width, daisy-chained grounds, vias under connector shells, plane necks and via fences, noisy nets beside FB / crystal pins. |
+| **Late changes** | Parts the user fixed are marked `"locked"` in a baseline file; after a part swap, a sync or a bulk move `baseline_diff.py` reports which of them, the board extent or a keep-out changed. Moving MCU signals follows what an STM32G431 board taught. |
 | **Before ordering** | `gerber_check.py` rebuilds connectivity from the Gerber copper and plated holes and compares it with the IPC-D-356 netlist (shorts, opens), renders what the fab will print, and diffs two releases so a late change cannot hide a regression. |
 | **Where it came from** | Written while designing a real 4-layer, 42 x 42 mm stepper driver (24 V daisy chain over USB-C, 5 A pass-through). The audit tables, USB-C fan-out template, EasyEDA API traps and JLCPCB ordering notes are what that board taught. |
 
@@ -66,6 +67,8 @@ else is standard library: `pip install -r requirements.txt`.
 - "How many 0.3 mm vias do I need for 5 A from the top layer to an inner 1 oz plane, and how wide must the plane be?"
 - "Check these Gerbers against the IPC-D-356 netlist before I order, and render both sides."
 - "I changed two resistor values after the review. Diff the new release against the one we checked."
+- "Review this board only, don't change anything."
+- "My SPI crosses itself under the MCU. Can I swap two pins to fix it?"
 
 ## What the tools print
 
@@ -77,7 +80,7 @@ ERROR EDGE C3 1.95 < 2.5 mm
 ERROR KEEPOUT U1 in 'antenna'
 ERROR FAR C3->U2 7.61 > 2.0 mm (buck input cap hot loop)
 WARN  ROT R1 45 deg (use 90 deg steps)
-INFO top occupancy 44% (courtyard sum / board area)
+INFO top occupancy 65% of usable area (dense; 44% of the whole board; usable = board - edge band - keep-outs)
 SUMMARY ERROR 6, WARN 5
 ```
 ![placement checker output](examples/placement/placement_bad.png)
@@ -104,6 +107,7 @@ Run from `skills/pcb-layout-design/`; every Python script has `--help`.
 | `scripts/placement_check.py` | courtyard overlap, part-class spacing, edge, keep-out, zone, near / apart, grid, rotation, occupancy; PNG |
 | `scripts/placement_from_kicad.py` | `.kicad_pcb` (KiCad 6-9 syntax; the older `module` form is read too) -> placement JSON |
 | `scripts/placement_from_easyeda.js` | board open in EasyEDA Pro -> placement JSON (runs inside the client) |
+| `scripts/baseline_diff.py` | two placement JSONs -> locked parts that moved, turned, flipped, resized or vanished; board extent and keep-out changes |
 | `scripts/pcbcalc.py` | trace width, via current, microstrip / stripline / differential impedance, LDO thermal, buck inductor, RC, divider, power budget |
 | `scripts/gerber_check.py` | `layers`, `render`, `netcheck --ipc`, `diff` on Gerber RS-274X + Excellon (EasyEDA, KiCad, Protel names, X2 attributes, mm and inch) |
 | `scripts/audit_release.py` | release folder or zip: required layers, file structure, BOM / CPL consistency |
@@ -114,7 +118,8 @@ Run from `skills/pcb-layout-design/`; every Python script has `--help`.
 skills/pcb-layout-design/    the skill (copy this folder to install by hand)
   SKILL.md                   procedure, numeric rules, verification steps, output formats
   scripts/                   the tools above
-  references/                review & release, routing review, EMC, power & thermal, EasyEDA API, JLCPCB, KiCad
+  references/                late changes, review & release, routing review, EMC, power & thermal, EasyEDA API,
+                             JLCPCB, KiCad
   assets/                    example placement JSON
 examples/                    checker inputs and outputs, a synthetic board for gerber_check
 evals/                       prompts with expected behaviour for agent evaluations
@@ -132,6 +137,8 @@ tests/                       python -m unittest discover -s tests
 - `gerber_check.py` works on a raster (0.02 mm by default): it proves connectivity, not clearance against fab rules.
   Blind / buried vias are treated as through holes; negative-image layers and step-and-repeat are reported, not drawn.
 - The JLCPCB notes record the order form and prices of October 2026 and will drift.
+- Importers read KiCad and EasyEDA placements; writing a checked placement back into the EDA tool is manual for now
+  (`references/kicad_notes.md`).
 
 ## Contributing
 

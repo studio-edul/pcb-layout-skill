@@ -1,0 +1,58 @@
+{
+ "board": {
+  "w": 42,
+  "h": 42,
+  "origin": [
+   -21,
+   -21
+  ],
+  "edge_clearance": 0.5,
+  "grid": 0.25
+ },
+ "zones": {},
+ "keepouts": [],
+ "parts": [
+  {
+   "ref": "J1",
+   "x": 0,
+   "y": -17.25,
+   "w": 10,
+   "h": 8.4,
+   "rot": 0,
+   "class": "connector",
+   "allow_overhang": true,
+   "locked": true
+  },
+  {
+   "ref": "J2",
+   "x": 0,
+   "y": 17.25,
+   "w": 10,
+   "h": 8.4,
+   "rot": 180,
+   "class": "connector",
+   "allow_overhang": true,
+   "locked": true
+  },
+  {
+   "ref": "U1",
+   "x": -4.5,
+   "y": 5.5,
+   "w": 9.3,
+   "h": 9.3,
+   "rot": 270,
+   "class": "ic"
+  },
+  {
+   "ref": "C1",
+   "x": 1.75,
+   "y": 1.0,
+   "w": 1.9,
+   "h": 1.1,
+   "rot": 0,
+   "class": "passive"
+  }
+ ],
+ "near": [],
+ "apart": []
+}

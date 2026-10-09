@@ -40,7 +40,11 @@ and vias - placement export - routing - manufacturing exports
 ## DRC
 - `pcb_Drc.overwriteCurrentRuleConfiguration(cur.config)` works when it gets the `.config` of
   `getCurrentRuleConfiguration()` (the wrapper object is silently ignored).
-- Waive a vendor-footprint violation by changing only that table entry, and record the waiver.
+- Read the rule set before placing: `pcb_Drc.getCurrentRuleConfiguration()` returns clearances, widths, via sizes
+  and the net-class tables.
+- Waive a vendor-footprint violation by changing only that table entry, and record the waiver. Example: the USB-C
+  footprint put its GND pads 0.145 mm from its own locating holes, flagged on every connector; a lower global
+  clearance would have hidden the same error anywhere else on the board.
 - "Netlist Error" (schematic vs PCB) also fires on harmless differences: display-only component properties and a
   net class that exists only on the PCB. Compare the exported netlists yourself (components, pins, nets) before
   acting on it.

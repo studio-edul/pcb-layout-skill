@@ -5,7 +5,7 @@ EasyEDA Pro + Freerouting + a grid router). **DRC 0 only proves clearance and co
 wrong on a DRC-clean board. The numbers in the tables are that board's - use them as a pattern, not as limits.
 
 Contents: 1 audit of a routed board - 2 power-path rating table - 3 inner power planes - 4 USB-C 16P fan-out -
-5 switching regulator as routed - 6 rework workflow (simulate, then apply)
+5 switching regulator as routed - 6 rework workflow (simulate, then apply) - 7 the visual pass
 
 ## 1. Audit of a routed board (autorouter output is a draft)
 | check | how | what was found |
@@ -111,3 +111,17 @@ pour fills) and a short script per check - length per net, width and via count p
 connector shells or pad rows, distance between noisy and sensitive nets. The checks that work on fabrication files
 alone (shorts / opens against the netlist, copper to edge, smallest gap between nets, silk) are in
 `scripts/gerber_check.py`.
+
+## 7. The visual pass
+The person receiving the board looks at the 2D view, the 3D view and the fab's preview; on this board they caught
+things every script had passed. Before reporting, look the same way:
+- **Each copper layer alone, then both sides in 3D.** Found that way: a screw terminal whose wire entries faced into
+  the board (footprint turned 180 deg), tracks and vias under USB-C shells, unconnected-pad markers, a part sitting on
+  the wrong side.
+- **Track shape.** 0 / 45 / 90 deg only (curves only where an RF design asks for them). Freerouting and its importer
+  left 17 pad-entry stubs a few degrees off: list the segments whose angle is not a multiple of 45 deg and move their
+  free end, never the pad end. Zigzags and loops that a shorter path would remove are measured with the length
+  ratio of section 1.
+- **What the fab will print.** `scripts/gerber_check.py render`: silk legible, bottom text reads correctly from below,
+  pin-1 and polarity marks inside the outline (a footprint's pin-1 dot beside an edge connector fell off the board).
+- Write each observation as a finding with layer and coordinates, fix it, and look again.

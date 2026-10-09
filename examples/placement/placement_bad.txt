@@ -9,6 +9,6 @@ WARN  GRID C2 (17.2, 16.1) not on 0.25 mm
 WARN  GRID L1 (7, 9.3) not on 0.25 mm
 WARN  GRID R1 (10.13, 20) not on 0.25 mm
 WARN  ROT R1 45 deg (use 90 deg steps)
-INFO top occupancy 44% (courtyard sum / board area)
+INFO top occupancy 65% of usable area (dense; 44% of the whole board; usable = board - edge band - keep-outs)
 SUMMARY ERROR 6, WARN 5
 INFO PNG written: placement_bad.png

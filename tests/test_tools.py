@@ -54,6 +54,11 @@ class PlacementCheck(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("SUMMARY ERROR 0, WARN 0", out)
 
+    def test_occupancy_is_on_usable_area(self):
+        _, out = run_script("placement_check.py", DATA / "placement_bad.json")
+        # 40 x 30 board, 2.5 mm edge band, 18 x 3.5 mm of the antenna keep-out inside it -> about 65 %, "dense"
+        self.assertIn("top occupancy 65% of usable area (dense; 44% of the whole board", out)
+
     def test_bundled_example_is_clean(self):
         rc, out = run_script("placement_check.py", ROOT / "skills" / "pcb-layout-design" / "assets" / "placement_example.json")
         self.assertEqual(rc, 0, out)
@@ -111,8 +116,16 @@ class PlacementFromKicad(unittest.TestCase):
         self.assertEqual((p["U1"]["w"], p["U1"]["class"]), (10.3, "ic"))
         self.assertEqual((p["C7"]["side"], p["C7"]["note"]), ("bottom", "pads+0.25"))     # no courtyard: pads + margin
         self.assertAlmostEqual(p["C7"]["w"], 2.45 + 0.5, places=3)
-        self.assertEqual((p["J1"]["rot"], p["J1"]["class"]), (0, "connector"))
+        self.assertEqual((p["J1"]["rot"], p["J1"]["rot_actual"], p["J1"]["class"]), (0, 45.0, "connector"))
         self.assertTrue(any("J1" in n for n in notes))                                     # 45 deg -> bounding box
+        self.assertNotIn("rot_actual", p["R1"])
+
+    def test_repeated_references_get_unique_names(self):
+        fp = '(footprint "R" (layer "F.Cu") (at {x} 105) (fp_text reference "REF**" (at 0 0) (layer "F.SilkS"))' \
+             '(fp_rect (start -1 -1) (end 1 1) (layer "F.CrtYd")))'
+        data, notes = load("placement_from_kicad").convert("(kicad_pcb " + fp.format(x=1) + fp.format(x=5) + fp.format(x=9) + ")")
+        self.assertEqual([p["ref"] for p in data["parts"]], ["REF**", "REF**#2", "REF**#3"])
+        self.assertEqual(sum("repeated reference" in n for n in notes), 2)
 
     def test_output_runs_through_the_checker(self):
         mod = load("placement_from_kicad")
@@ -123,6 +136,118 @@ class PlacementFromKicad(unittest.TestCase):
             self.assertEqual(rc, 0)
             rc, text = run_script("placement_check.py", out)
             self.assertIn("SUMMARY", text)
+
+
+class BaselineDiff(unittest.TestCase):
+    BASE = {"board": {"w": 42, "h": 42, "origin": [-21, -21]},
+            "keepouts": [{"name": "antenna", "rect": [10, 10, 20, 20], "allow": ["U2"]}],
+            "parts": [{"ref": "J1", "x": 0, "y": -17.25, "w": 10, "h": 8, "rot": 0, "class": "connector", "locked": True},
+                      {"ref": "H1", "x": -15.5, "y": -15.5, "w": 6, "h": 6, "class": "mech", "locked": True},
+                      {"ref": "U1", "x": -4.5, "y": 5.5, "w": 9, "h": 9, "rot": 270, "class": "ic", "locked": True},
+                      {"ref": "J2", "x": 15, "y": 0, "w": 6, "h": 4, "class": "connector"},
+                      {"ref": "R1", "x": 1, "y": 1, "w": 1.6, "h": 0.8, "class": "passive"}]}
+
+    def run_pair(self, change, *args, base=None):
+        base = base or self.BASE
+        cur = json.loads(json.dumps(base))
+        change(cur)
+        with tempfile.TemporaryDirectory() as t:
+            b, c = Path(t) / "b.json", Path(t) / "c.json"
+            b.write_text(json.dumps(base)); c.write_text(json.dumps(cur))
+            return call(load("baseline_diff"), b, c, *args)
+
+    def test_unchanged(self):
+        rc, out = self.run_pair(lambda d: None)
+        self.assertEqual(rc, 0)
+        self.assertIn("SUMMARY baseline changes 0", out)
+
+    def test_unlocked_parts_are_only_counted(self):
+        def change(d):
+            d["parts"][3]["x"] = 16                             # unlocked connector
+            d["parts"][4]["x"] = 3                              # passive
+            d["parts"].append({"ref": "C9", "x": 0, "y": 0, "w": 1, "h": 1})
+        rc, out = self.run_pair(change)
+        self.assertEqual(rc, 0)
+        self.assertIn("INFO  3 other change(s)", out)
+        rc, out = self.run_pair(change, "--list-others")
+        self.assertIn("MOVED J2", out)
+        self.assertIn("1 part(s) not in the baseline: C9", out)
+        rc, out = self.run_pair(change, "--classes", "connector")
+        self.assertEqual(rc, 1)
+        self.assertIn("ERROR MOVED J2", out)
+
+    def test_locked_parts_are_watched(self):
+        def change(d):
+            d["parts"][0]["x"] += 0.2                           # connector moved
+            d["parts"][1]["side"] = "bottom"                    # mounting hole flipped
+            d["parts"][2]["rot"] = 0                            # IC turned
+        rc, out = self.run_pair(change)
+        self.assertEqual(rc, 1)
+        for m in ("MOVED J1 by (+0.200, +0.000)", "SIDE H1 top -> bottom", "ROTATED U1 270 -> 0", "SUMMARY baseline changes 3"):
+            self.assertIn(m, out)
+
+    def test_removed_part_outline_and_tolerance(self):
+        def change(d):
+            del d["parts"][0]
+            d["board"]["w"] = 42.5
+            d["parts"][1]["x"] += 0.005                          # U1, inside the 0.01 mm tolerance
+            d["parts"][1]["rot"] = -90                           # same as 270
+        rc, out = self.run_pair(change)
+        self.assertEqual(rc, 1)
+        self.assertIn("REMOVED J1", out)
+        self.assertIn("OUTLINE w 42 -> 42.5", out)
+        self.assertNotIn("U1", out)
+        rc, out = self.run_pair(lambda d: d.pop("board"))
+        self.assertIn("OUTLINE board missing", out)
+
+    def test_size_and_keepouts(self):
+        def change(d):
+            d["parts"][0]["w"] = 11                              # footprint update resized J1
+            d["keepouts"][0]["allow"].append("C3")              # keep-out loosened
+            d["keepouts"].append({"name": "screw", "circle": [0, 0, 3]})
+        rc, out = self.run_pair(change, "--list-others")
+        self.assertEqual(rc, 1)
+        self.assertIn("SIZE J1 10 x 8 -> 11 x 8 mm", out)
+        self.assertIn("ERROR KEEPOUT antenna now allows C3", out)
+        self.assertIn("INFO  KEEPOUT screw added", out)
+        rc, out = self.run_pair(lambda d: d["keepouts"].clear())
+        self.assertIn("ERROR KEEPOUT antenna removed", out)
+
+    def test_rot_actual_is_compared(self):
+        base = json.loads(json.dumps(self.BASE))
+        base["parts"][2].update(rot=0, rot_actual=45.0)
+        rc, out = self.run_pair(lambda d: d["parts"][2].update(rot_actual=30.0), base=base)
+        self.assertEqual(rc, 1)
+        self.assertIn("ROTATED U1 45 -> 30", out)
+
+    def test_nothing_watched_is_not_a_pass(self):
+        base = json.loads(json.dumps(self.BASE))
+        for p in base["parts"]:
+            p.pop("locked", None)
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            rc, _ = self.run_pair(lambda d: None, base=base)
+        self.assertEqual(rc, 2)
+        self.assertIn("nothing to watch", err.getvalue())
+        rc, out = self.run_pair(lambda d: None, "--classes", "connector", base=base)
+        self.assertEqual(rc, 0)
+        self.assertIn("SUMMARY baseline changes 0 (2 watched part(s), 1 keep-out(s))", out)
+
+    def test_refs_and_all(self):
+        rc, out = self.run_pair(lambda d: d["parts"][4].update(x=3), "--refs", " R1 , X9")
+        self.assertEqual(rc, 1)
+        self.assertIn("ERROR MOVED R1", out)
+        rc, _ = self.run_pair(lambda d: d["parts"][4].update(x=3), "--all")
+        self.assertEqual(rc, 1)
+
+    def test_unusable_input_exits_2(self):
+        for change in (lambda d: d["parts"].append(dict(d["parts"][4])),       # duplicate ref
+                       lambda d: d["parts"][4].update(x="1.0"),               # string number
+                       lambda d: d["parts"][4].update(locked="yes"),
+                       lambda d: d["keepouts"][0].update(allow=None),
+                       lambda d: d["keepouts"][0].update(rect=[0, 0, 1])):
+            with self.assertRaises(SystemExit) as e, contextlib.redirect_stderr(io.StringIO()):
+                self.run_pair(change)
+            self.assertEqual(e.exception.code, 2)
 
 
 try:

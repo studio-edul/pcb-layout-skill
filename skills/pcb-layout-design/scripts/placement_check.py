@@ -13,7 +13,10 @@ Input JSON (mm, origin = board lower-left unless "origin" says otherwise, y up):
  "apart": [{"a","b","min","why"}],   courtyard edge-to-edge distance must be >= min
  "spacing": {"passive-passive": 0.3, ...}   optional overrides of the default table
 }
-ERROR: OVERLAP, SPACING, EDGE, OUTSIDE, KEEPOUT, FAR, CLOSE, ZONE.  WARN: grid, rotation.  INFO: occupancy.
+ERROR: OVERLAP, SPACING, EDGE, OUTSIDE, KEEPOUT, FAR, CLOSE, ZONE.  WARN: grid, rotation.
+INFO: occupancy per side = courtyard sum / usable area (board - edge band - keep-outs), with the SKILL.md verdict.
+Classes connector, module and mech are exempt from the EDGE rule (edge connectors, antenna-edge modules, holes);
+check a module's antenna edge yourself or model its antenna area as a keep-out with "allow": [<module ref>].
 Exit code 1 if any ERROR.  --png out.png draws the board (violating parts red).
 Rotation must be 0 / 90 / 180 / 270: any other angle is checked as rot 0 (axis-aligned courtyard) and warned.
 """
@@ -143,8 +146,29 @@ def check(d):
                 errs.append(f"CLOSE {n['a']}<->{n['b']} {g:.2f} < {n['min']} mm" + (f" ({n['why']})" if n.get("why") else "")); bad |= {n["a"], n["b"]}
 
     area = sum((R[r][2] - R[r][0]) * (R[r][3] - R[r][1]) for r, p in parts.items() if p.get("class") != "mech")
-    occ = area / (b["w"] * b["h"]) * 100
+    occ = area / (b["w"] * b["h"]) * 100      # whole-board occupancy, kept in the return value for callers of check()
     return errs, warns, occ, bad, R, bx
+
+
+def usable_area(d, side):
+    """(board area, usable area) in mm2: board minus the edge band minus keep-outs on that side. Rectangles are clipped
+    to the inner area; circles count in full even where they reach past it, and overlapping keep-outs count twice -
+    both err towards a higher occupancy."""
+    b = d["board"]
+    ec = b.get("edge_clearance", 0.0)
+    area = b["w"] * b["h"]
+    inner = max(b["w"] - 2 * ec, 0) * max(b["h"] - 2 * ec, 0)
+    x0, y0 = b.get("origin", [0, 0])
+    ix0, iy0, ix1, iy1 = x0 + ec, y0 + ec, x0 + b["w"] - ec, y0 + b["h"] - ec
+    for k in d.get("keepouts", []):
+        if k.get("side", "both") not in ("both", side):
+            continue
+        if "rect" in k:
+            r = k["rect"]
+            inner -= max(min(r[2], ix1) - max(r[0], ix0), 0) * max(min(r[3], iy1) - max(r[1], iy0), 0)
+        elif "circle" in k:
+            inner -= math.pi * k["circle"][2] ** 2
+    return area, max(inner, 0.0)
 
 
 def draw(d, R, bx, bad, path):
@@ -188,13 +212,14 @@ def main():
     for e in errs: print("ERROR", e)
     for w in warns: print("WARN ", w)
     sides = {p.get("side", "top") for p in d["parts"]}
-    if sides <= {"top"}:
-        print(f"INFO top occupancy {occ:.0f}% (courtyard sum / board area)")
-    else:
-        for sd in ("top", "bottom"):
-            a = sum((R[p["ref"]][2] - R[p["ref"]][0]) * (R[p["ref"]][3] - R[p["ref"]][1]) for p in d["parts"]
-                    if p.get("class") != "mech" and p.get("side", "top") in (sd, "both"))
-            print(f"INFO {sd} occupancy {a / (d['board']['w'] * d['board']['h']) * 100:.0f}%")
+    for sd in (("top",) if sides <= {"top"} else ("top", "bottom")):
+        a = sum((R[p["ref"]][2] - R[p["ref"]][0]) * (R[p["ref"]][3] - R[p["ref"]][1]) for p in d["parts"]
+                if p.get("class") != "mech" and p.get("side", "top") in (sd, "both"))
+        board_area, usable = usable_area(d, sd)
+        pct = a / usable * 100 if usable > 0 else float("inf")
+        verdict = "relaxed" if pct < 40 else "normal" if pct < 60 else "dense" if pct < 75 else "too dense"
+        print(f"INFO {sd} occupancy {pct:.0f}% of usable area ({verdict}; {a / board_area * 100:.0f}% of the whole board; "
+              f"usable = board - edge band - keep-outs)")
     print(f"SUMMARY ERROR {len(errs)}, WARN {len(warns)}")
     if "--png" in args:
         i = args.index("--png")

@@ -4,7 +4,9 @@
     {
       "id": "placement-check-before-handover",
       "prompt": "Here is my placement for a small buck + module board (evals/files/placement_bad.json). Is it ready to push to the EDA tool?",
-      "files": ["evals/files/placement_bad.json"],
+      "files": [
+        "evals/files/placement_bad.json"
+      ],
       "expected_output": "Runs scripts/placement_check.py on the file, reports ERROR 6 / WARN 5 with the overlaps, the edge and keep-out violations and the buck input cap that is 7.6 mm from U2, says the placement is not ready, and proposes concrete moves.",
       "assertions": [
         "placement_check.py was actually run (its SUMMARY line is quoted)",
@@ -27,7 +29,10 @@
     {
       "id": "gerber-netlist-check",
       "prompt": "Before I order: check the fabrication files in evals/files/board_bad against the netlist evals/files/board_bad.ipc.",
-      "files": ["evals/files/board_bad", "evals/files/board_bad.ipc"],
+      "files": [
+        "evals/files/board_bad",
+        "evals/files/board_bad.ipc"
+      ],
       "expected_output": "Runs scripts/gerber_check.py netcheck, reports one short (net A to net B at R1) and one open (net A: missing via between the top copper and U1-1 on the bottom), and says the files must not be ordered as they are.",
       "assertions": [
         "gerber_check.py netcheck was run",
@@ -55,6 +60,55 @@
         "the answer says not to apply importChanges on that board and why",
         "the part-swap procedure from references/easyeda_pro_api.md is given",
         "a netlist comparison after the edit is required"
+      ]
+    },
+    {
+      "id": "review-only-stays-read-only",
+      "prompt": "Review my placement in evals/files/placement_bad.json. Review only - I'll make the changes myself.",
+      "files": [
+        "evals/files/placement_bad.json"
+      ],
+      "expected_output": "Treats the job as review only: runs the checker, reports findings in the review format with severity and fix, and does not write a corrected placement file or claim to have changed anything.",
+      "assertions": [
+        "no file in evals/files is modified and no corrected placement JSON is written",
+        "findings use the [Severity] title / Evidence / Impact / Fix / Confidence structure",
+        "the answer states what was checked and what could not be verified"
+      ]
+    },
+    {
+      "id": "baseline-after-bulk-operation",
+      "prompt": "I ran 'align centres' on a group of parts. Here are the placement before (evals/files/baseline.json) and after (evals/files/after_align.json). Anything I should worry about?",
+      "files": [
+        "evals/files/baseline.json",
+        "evals/files/after_align.json"
+      ],
+      "expected_output": "Runs scripts/baseline_diff.py, reports that the locked connector J2 moved by +1.0 mm in x and must be restored (or the baseline re-saved after the user confirms), and that the C1 move is only counted as INFO.",
+      "assertions": [
+        "baseline_diff.py was run",
+        "J2 is reported as a baseline change to restore",
+        "C1 is not treated as an error"
+      ]
+    },
+    {
+      "id": "spi-pins-cannot-trade-functions",
+      "prompt": "My SPI to the motor driver crosses itself under the STM32. Can I just swap PA5 and PA7 on the PCB to uncross it?",
+      "files": [],
+      "expected_output": "Explains that PA5 (SPI1_SCK) and PA7 (SPI1_MOSI) cannot trade places because the SPI functions belong to the pins; offers a real way out (another pin pair from the alternate-function table, e.g. PB3 / PB5 for SPI1, or a different route) and what else a new pin does at reset; the change starts in the schematic and the firmware pin map, not on the PCB.",
+      "assertions": [
+        "it says swapping PA5 and PA7 does not work because SCK and MOSI are different alternate functions",
+        "it offers another pin pair from the alternate-function table or a routing fix",
+        "the change is made in the schematic and the firmware pin map, not only on the PCB"
+      ]
+    },
+    {
+      "id": "fixed-connectors-stay-fixed",
+      "prompt": "Here's my KiCad project. The outline and the connectors are fixed by the enclosure. Start placing the parts.",
+      "files": [],
+      "expected_output": "No project file is attached, so the answer lays out the plan: import the board with placement_from_kicad.py, save it as baseline.json with \"locked\": true on the connectors, read the project's rule set (Board Setup) before placing, run placement_check.py before any coordinate is applied, and run baseline_diff.py after the placement is pushed back.",
+      "assertions": [
+        "the connectors are marked locked in a baseline and checked with baseline_diff.py after the placement is pushed",
+        "the project's saved clearances / net classes are read before parts are placed",
+        "placement_check.py runs before any coordinate is applied"
       ]
     }
   ]

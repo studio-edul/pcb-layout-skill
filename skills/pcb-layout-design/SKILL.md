@@ -15,7 +15,7 @@ compatibility: >-
   scripts use the standard library. Works with any EDA tool; KiCad and EasyEDA Pro importers included.
 metadata:
   author: studio-edul
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # PCB layout design
@@ -26,14 +26,16 @@ Scripts (run from this skill's directory; every Python script prints `--help`):
 | `scripts/placement_check.py` | placement JSON -> ERROR / WARN list + PNG. **Mandatory before coordinates go anywhere** |
 | `scripts/placement_from_kicad.py` | `.kicad_pcb` -> placement JSON skeleton (courtyards, sides, classes) |
 | `scripts/placement_from_easyeda.js` | same for the board open in EasyEDA Pro (run inside the client) |
+| `scripts/baseline_diff.py` | baseline vs current placement JSON -> locked parts, board extent or keep-outs that changed |
 | `scripts/pcbcalc.py` | trace width, via current, microstrip / stripline / differential impedance, LDO heat, buck inductor, RC, divider, power budget |
 | `scripts/gerber_check.py` | fabrication files: `layers`, `render` (print preview, silk on pads, copper to edge), `netcheck` (copper + plated holes vs IPC-D-356: shorts, opens), `diff` (two releases) |
 | `scripts/audit_release.py` | release folder / zip: required layers, Gerber / Excellon structure, BOM / CPL consistency |
 
 References (read when the task needs them):
+- `references/late_changes.md` - changing a laid-out board: what part swaps and syncs broke, `baseline_diff.py`, moving MCU signals (STM32G431)
 - `references/review_release.md` - review rubric and finding format, DFM checklist, release checks, bring-up
-- `references/routing_review.md` - post-route audit beyond DRC, power-path rating table, inner planes, USB-C 16P fan-out, simulate-then-apply rework
-- `references/emc_protection.md` - return paths, signal routing, ESD / TVS / surge, filtering, isolation
+- `references/routing_review.md` - post-route audit beyond DRC, power-path rating table, inner planes, USB-C 16P fan-out, simulate-then-apply rework, the visual pass
+- `references/emc_protection.md` - return paths and layer changes, crosstalk spacing, signal routing, ESD / TVS / surge, filtering, isolation
 - `references/power_thermal.md` - power budget, theta_JA tables, formulas, heatsink position, analog supply
 - `references/easyeda_pro_api.md` - scripted layout in EasyEDA Pro: units, rotations, pours, DRC, part swaps, traps
 - `references/jlcpcb_ordering.md` - order options, PCBA cost model, BOM / CPL upload traps (dated, re-check)
@@ -49,9 +51,12 @@ References (read when the task needs them):
    up rated 2-3 A).
 4. **No coordinates are handed over or pushed to an EDA tool before `placement_check.py` reports ERROR 0** and
    its PNG has been opened and described in one line. No tool access is not an exception.
-5. **Don't mutate design files blindly.** Read the project first, keep a saved copy before bulk edits, read back
-   and verify after every scripted stage. Bulk rework is simulated on a board dump first and the real board is
-   diffed against the simulation afterwards (`references/routing_review.md` section 6).
+5. **Don't mutate design files blindly.** A review writes nothing. Read the project first, including its saved rule
+   set ("project rule" in section 8), keep a saved copy before bulk edits, read back and verify after every scripted
+   stage. Parts the user fixed carry `"locked": true` in a baseline file; after part swaps, syncs and optimiser runs
+   `scripts/baseline_diff.py` prints `SUMMARY baseline changes 0` (`references/late_changes.md`). Bulk rework is
+   simulated on a board dump first and the real board is diffed against the simulation afterwards
+   (`references/routing_review.md` section 6).
 6. **DRC 0 is not a review.** Autorouter output is a draft. Before calling a routed board done, run the
    post-route audit and check every numbered rule of the project's own guide against the board - planned
    rules (thermal vias, heat-spreader areas, via counts) silently drop out during routing.
@@ -67,7 +72,8 @@ References (read when the task needs them):
 2. **Architecture & schematic** - block diagram, power tree + budget, pin allocation, ERC 0. Re-assign MCU pins
    after placement so every bus leaves on the package side facing its target, in the target's pin order; swap
    interchangeable signals (motor phase polarity, CC1/CC2, ESD-array channels, plain GPIOs) to uncross. Do this
-   before fighting the router and write the final pin map into the spec for firmware.
+   before fighting the router and write the final pin map into the spec for firmware. What a pin move must
+   respect: `references/late_changes.md` section 3.
 3. **Stackup, placement, routing** - sections 1-7.
 4. **Release** - DRC 0 with fab rules, Gerber / drill / BOM / CPL, section 7 steps 8-9.
 5. **Bring-up** - current-limited supply, rails before expensive parts, log measurements.
@@ -80,7 +86,8 @@ References (read when the task needs them):
 - Spacing values are **targets**; fab minimums are lower bounds (in parentheses). Never design to the bound.
 
 ## 1. Area budget first
-Sum of courtyards / usable area (board minus hole keep-outs and edge band); state the number.
+Sum of courtyards / usable area (board minus hole keep-outs and edge band); state the number - `placement_check.py`
+prints it per side with the verdict below.
 | occupancy | verdict | action |
 |---|---|---|
 | < 40 % | relaxed | 2-layer may work |
@@ -100,7 +107,8 @@ service (`references/jlcpcb_ordering.md`) - report it to the user with the cost.
 - Separation (edge-to-edge): crystal vs buck SW / inductor >= 15 mm, crystal vs motor outputs >= 12 mm,
   ADC / analog RC vs SW node >= 10 mm, microphone / analog sensor vs inductor >= 15 mm.
 - RF modules: antenna edge flush with / beyond the board edge, keep-out exactly per the module datasheet on all
-  layers (copper, parts, holes, battery, screws).
+  layers (copper, parts, holes, battery, screws). In the checker JSON the antenna area is a keep-out with
+  `"allow": ["<module ref>"]` (see `assets/placement_example.json`).
 
 ## 3. Placement order (strict)
 1. Outline, mounting holes, keep-outs (M3: part keep-out radius 3.5-4.0 mm, copper keep-out >= 3 mm), edge band.
@@ -131,7 +139,9 @@ connector-anything 1.0 (THT pins 1.5 for the iron); tall (> 5 mm) parts +1 mm.
 Checker classes: passive / power / ic / module / connector / mech.
 
 **Edges:** copper 0.4 mm (pour 0.5; never < 0.3), SMD pad 0.8 mm, body 0.5 mm for assembly without rails; 2.5 mm if
-the assembler needs rails. Edge-hanging connectors (USB-C) are exempt - tell the fab (`references/jlcpcb_ordering.md`).
+the assembler needs rails. The checker exempts classes connector, module and mech from this rule (edge-hanging
+USB-C, antenna-edge modules, holes): check those edges yourself, and tell the fab about overhangs
+(`references/jlcpcb_ordering.md`).
 
 ## 5. Block rules -> near / apart entries (edge-to-edge)
 Cite the rule ID in reviews and in the checker's `why` field.
@@ -157,8 +167,8 @@ Cite the rule ID in reviews and in the checker's `why` field.
 - 4-layer: L1 parts + signals, **L2 solid GND (no traces, no slots)**, L3 power areas, L4 slow signals + GND.
 - Widths from `pcbcalc.py trace-width` (5 A, 1 oz outer, 10 C rise -> 2.8 mm; 3.5 mm with margin); share high
   current between an outer trace and an inner area; via arrays from `pcbcalc.py via-current`.
-- Clearance 0.15 mm default, 0.30 mm on 24 V nets. Tracks 0 / 45 / 90 deg only (fix router / importer skew before
-  release), no acute angles.
+- Clearance 0.15 mm default, 0.30 mm on 24 V nets. Tracks 0 / 45 / 90 deg only (curves only where an RF design asks
+  for them; fix router / importer skew before release), no acute angles.
 - Vias: none under connector shells; under ICs only EP thermal vias and that IC's own pin / decoupling vias; never
   in or between fine-pitch pads; >= 0.2 mm (target) from pads of other nets.
 - Power is never left at autorouter width: draw the power stage by hand first (bars + via arrays at the pads),
@@ -166,9 +176,12 @@ Cite the rule ID in reviews and in the checker's `why` field.
 - Plane layers: a signal track there cuts the plane - short hops only, parallel to the plane current, no power via
   left in a pocket. Via antipads merge below ~1.1 mm pitch (0.6 mm via, 0.25 mm plane clearance): a row of vias
   across a plane strip is a fence. Sheet resistance 0.5 oz ~ 1 mOhm/square, 1 oz ~ 0.5.
-- Every layer change of a fast signal gets a GND return via within 2 mm; <= 2 vias per fast net.
-- SPI: MOSI/SCLK matched +-2 mm, series R at the source only when the waveform needs it, <= 1 via, >= 3x width from
-  other signals, never parallel to I2C / UART > 5 mm. I2C >= 10x width from SPI SCLK, never parallel to PWM / STEP.
+- A fast signal's layer change moves its return current too: GND to GND reference -> a GND via beside the signal via
+  (about 2 mm, heuristic); GND to a power plane -> a stitching capacitor near the via, or stay on the layer. <= 2 vias
+  per fast net. Two signal layers with no plane between them couple broadside: cross them, don't stack them.
+- SPI: MOSI/SCLK matched +-2 mm, series R at the source only when the waveform needs it, <= 1 via, edge gap >= 2x
+  width to other signals (the 3W rule, centre to centre), never parallel to I2C / UART > 5 mm. I2C >= 10x width from
+  SPI SCLK, never parallel to PWM / STEP.
 - Kelvin-connect sense / ADC lines; ESD current path short and wide to the plane.
 - Copper hygiene: no islands, no necks < 0.2 mm, thermal relief on pour pads (not on EPs), GND stitching along the
   edge every 5-10 mm.
@@ -185,8 +198,9 @@ Cite the rule ID in reviews and in the checker's `why` field.
 6. After routing: tool DRC (clearance, unrouted 0, silk over pads 0).
 7. Post-route audit (`references/routing_review.md`): satellite connection lengths, power widths and via counts in
    the power-path rating table, own ground vias, copper / vias under shells and ICs, plane necks and pockets on the
-   real fill, noisy nets beside sensitive pins, detours, track angles, thermal provisions. Fix, re-run DRC, list
-   what stays with the reason. Parts moved while routing go back through steps 1-5.
+   real fill, noisy nets beside sensitive pins, detours, track angles, thermal provisions - then the visual pass of
+   section 7 there. Fix, re-run DRC, list what stays with the reason. Parts moved while routing go back through
+   steps 1-5, and where a baseline exists `baseline_diff.py` prints `SUMMARY baseline changes 0`.
 8. Release files: `python scripts/audit_release.py <dir-or-zip> --layers <n>` (add `--pcb-only` when there is no
    BOM / CPL yet) and the checklist in `references/review_release.md`.
 9. Fabrication-level checks with the exported IPC-D-356 netlist:
@@ -196,7 +210,8 @@ Cite the rule ID in reviews and in the checker's `why` field.
    copper-to-edge), and after any late change `gerber_check.py diff <checked> <new>` - only the intended change
    may show. When the user hands over fabrication files alone, steps 8-9 are the whole job.
 
-Self-test: `assets/placement_example.json` -> ERROR 0 / WARN 0 (the repository's `tests/` cover every Python script).
+Self-test: `assets/placement_example.json` -> ERROR 0 / WARN 0 (the repository's `tests/` cover every
+Python script).
 
 ## 8. Output formats
 - **Design:** assumptions, occupancy %, zone table, coordinate table (ref, x, y, rot, side), checker summary,
