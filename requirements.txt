@@ -1,0 +1,6 @@
+# Only needed by scripts/gerber_check.py (numpy, pillow, scipy) and for placement_check.py PNGs (matplotlib).
+# Every other script uses the Python standard library.
+numpy
+pillow
+scipy
+matplotlib

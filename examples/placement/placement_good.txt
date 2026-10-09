@@ -1,0 +1,3 @@
+INFO top occupancy 44% (courtyard sum / board area)
+SUMMARY ERROR 0, WARN 0
+INFO PNG written: placement_good.png

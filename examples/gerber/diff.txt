@@ -1,0 +1,8 @@
+DIFF  copper L1: 0 only in A, 1 only in B (x 4.00..4.00, y 6.00..10.00)
+same  copper L99 (4 objects)
+same  mask_bottom (2 objects)
+same  outline (4 objects)
+same  mask_top (4 objects)
+same  silk_top (2 objects)
+DIFF  drill files differ
+SUMMARY 2 layer(s) differ

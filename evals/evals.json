@@ -1,0 +1,61 @@
+{
+  "skill_name": "pcb-layout-design",
+  "evals": [
+    {
+      "id": "placement-check-before-handover",
+      "prompt": "Here is my placement for a small buck + module board (evals/files/placement_bad.json). Is it ready to push to the EDA tool?",
+      "files": ["evals/files/placement_bad.json"],
+      "expected_output": "Runs scripts/placement_check.py on the file, reports ERROR 6 / WARN 5 with the overlaps, the edge and keep-out violations and the buck input cap that is 7.6 mm from U2, says the placement is not ready, and proposes concrete moves.",
+      "assertions": [
+        "placement_check.py was actually run (its SUMMARY line is quoted)",
+        "the answer says the placement is NOT ready (ERROR > 0)",
+        "the C3 -> U2 distance violation is named with the buck hot-loop reason",
+        "no coordinates are presented as final while ERROR > 0"
+      ]
+    },
+    {
+      "id": "via-count-by-calculation",
+      "prompt": "How many 0.3 mm vias do I need to carry 5 A from the top layer to an inner plane? 1.6 mm board, 20 um plating.",
+      "files": [],
+      "expected_output": "Runs scripts/pcbcalc.py via-current (about 0.53 A per via at 10 C rise with 0.7 derating), concludes about 10 vias (>= 9.4) for 10 C rise, states the assumptions and limits, and mentions the plane width / copper weight as the next weakest element.",
+      "assertions": [
+        "pcbcalc.py via-current was run rather than a rule of thumb",
+        "the per-via figure is between 0.45 and 0.65 A and the count is between 8 and 12",
+        "assumptions (temperature rise, plating, derating) are stated"
+      ]
+    },
+    {
+      "id": "gerber-netlist-check",
+      "prompt": "Before I order: check the fabrication files in evals/files/board_bad against the netlist evals/files/board_bad.ipc.",
+      "files": ["evals/files/board_bad", "evals/files/board_bad.ipc"],
+      "expected_output": "Runs scripts/gerber_check.py netcheck, reports one short (net A to net B at R1) and one open (net A: missing via between the top copper and U1-1 on the bottom), and says the files must not be ordered as they are.",
+      "assertions": [
+        "gerber_check.py netcheck was run",
+        "both the short between A and B and the open on A are reported",
+        "the answer advises against ordering these files"
+      ]
+    },
+    {
+      "id": "review-format",
+      "prompt": "Review this note from my layout: 'The 24 V motor phase OUT1A is 0.25 mm wide for 6 mm and carries 1.5 A RMS.' Give me the finding.",
+      "files": [],
+      "expected_output": "One finding in the skill format: severity (Major), title, evidence with the pcbcalc trace-width result for 1.5 A on 1 oz outer copper (about 0.53 mm at 10 C rise, 0.35 mm at 20 C), impact, fix, confidence.",
+      "assertions": [
+        "the finding uses the [Severity] title / Evidence / Impact / Fix / Confidence structure",
+        "the required width comes from pcbcalc.py trace-width, not from memory",
+        "severity is not Critical for a fixable width issue"
+      ]
+    },
+    {
+      "id": "easyeda-import-changes-trap",
+      "prompt": "I placed all parts of my EasyEDA Pro board with a script. Now I changed one resistor in the schematic. Can I just run Import Changes on the PCB?",
+      "files": [],
+      "expected_output": "Warns that on a script-placed board importChanges proposes to remove and re-add every part (placement and routing lost), and describes the part-swap method instead: new device at the old position with the old unique id, pad nets copied by pad number, netlist comparison afterwards.",
+      "assertions": [
+        "the answer says not to apply importChanges on that board and why",
+        "the part-swap procedure from references/easyeda_pro_api.md is given",
+        "a netlist comparison after the edit is required"
+      ]
+    }
+  ]
+}

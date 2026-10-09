@@ -1,0 +1,4 @@
+top: wrote preview_top.png; silk on mask openings 0.179 mm2 (the fab clips it)
+bottom: wrote preview_bottom.png; silk on mask openings 0.000 mm2 (the fab clips it)
+      test-F_Cu.gbr: copper to board edge min 3.010 mm at (3.00, 7.00)
+      test-B_Cu.gbr: copper to board edge min 3.170 mm at (16.84, 5.12)

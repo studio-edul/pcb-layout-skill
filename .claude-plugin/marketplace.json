@@ -1,0 +1,12 @@
+{
+  "name": "studio-edul",
+  "owner": { "name": "studio-edul" },
+  "description": "Hardware design skills",
+  "plugins": [
+    {
+      "name": "pcb-layout-design",
+      "source": "./",
+      "description": "PCB layout design partner with a deterministic placement checker and Gerber-level release checks"
+    }
+  ]
+}

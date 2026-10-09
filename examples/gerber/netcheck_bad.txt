@@ -1,0 +1,5 @@
+pads and vias in the netlist 6, on copper 6; plated hits touching < 2 layers 0
+ERROR SHORT A: R1-1, via(10.00,10.00) / B: R1-2, J1-1
+ERROR OPEN  A: R1-1, via(10.00,10.00) | U1-1
+ERROR NO_DRILL via (A) at (10.00, 10.00): no plated hole in the drill files - layers are not joined there
+SUMMARY shorts 1, opens 1, pads without copper 0, undrilled 1

@@ -1,0 +1,2 @@
+pads and vias in the netlist 6, on copper 6; plated hits touching < 2 layers 0
+SUMMARY shorts 0, opens 0, pads without copper 0, undrilled 0
