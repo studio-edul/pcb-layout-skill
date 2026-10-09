@@ -37,7 +37,7 @@
 
 **Claude Code (플러그인)**
 ```
-/plugin marketplace add studio-edul/pcb-layout-design
+/plugin marketplace add studio-edul/pcb-layout-skill
 /plugin install pcb-layout-design@studio-edul
 ```
 
@@ -46,9 +46,9 @@
 **다른 에이전트**
 | 에이전트 | 방법 |
 |---|---|
-| [skills.sh](https://skills.sh) 지원 에이전트 | `npx skills add studio-edul/pcb-layout-design --skill pcb-layout-design` |
+| [skills.sh](https://skills.sh) 지원 에이전트 | `npx skills add studio-edul/pcb-layout-skill --skill pcb-layout-design` |
 | Codex | `skills/pcb-layout-design/`를 저장소의 `.agents/skills/`나 `~/.agents/skills/`에 복사 |
-| Gemini CLI | `gemini skills install https://github.com/studio-edul/pcb-layout-design --path skills/pcb-layout-design --consent` |
+| Gemini CLI | `gemini skills install https://github.com/studio-edul/pcb-layout-skill --path skills/pcb-layout-design --consent` |
 | claude.ai / API | `skills/pcb-layout-design/`를 zip으로 묶어 스킬로 업로드 |
 
 **Python** 3.9 이상이 필요합니다.

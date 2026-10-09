@@ -4,7 +4,7 @@
 runs a deterministic placement checker before any coordinate reaches your EDA tool, sizes power paths by calculation,
 audits routed boards beyond DRC, and verifies the fabrication files themselves before you pay for them.
 
-[![tests](https://github.com/studio-edul/pcb-layout-design/actions/workflows/ci.yml/badge.svg)](https://github.com/studio-edul/pcb-layout-design/actions/workflows/ci.yml)
+[![tests](https://github.com/studio-edul/pcb-layout-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/studio-edul/pcb-layout-skill/actions/workflows/ci.yml)
 ![license](https://img.shields.io/badge/license-MIT-blue) ![agent skills](https://img.shields.io/badge/Agent%20Skills-SKILL.md-green)
 
 [한국어 README](README.ko.md)
@@ -40,7 +40,7 @@ How it relates to other projects (October 2026):
 
 **Claude Code (plugin)**
 ```
-/plugin marketplace add studio-edul/pcb-layout-design
+/plugin marketplace add studio-edul/pcb-layout-skill
 /plugin install pcb-layout-design@studio-edul
 ```
 
@@ -50,9 +50,9 @@ How it relates to other projects (October 2026):
 **Other agents**
 | agent | how |
 |---|---|
-| any agent supported by [skills.sh](https://skills.sh) | `npx skills add studio-edul/pcb-layout-design --skill pcb-layout-design` |
+| any agent supported by [skills.sh](https://skills.sh) | `npx skills add studio-edul/pcb-layout-skill --skill pcb-layout-design` |
 | Codex | copy `skills/pcb-layout-design/` to `.agents/skills/` in the repo or `~/.agents/skills/` |
-| Gemini CLI | `gemini skills install https://github.com/studio-edul/pcb-layout-design --path skills/pcb-layout-design --consent` |
+| Gemini CLI | `gemini skills install https://github.com/studio-edul/pcb-layout-skill --path skills/pcb-layout-design --consent` |
 | claude.ai / API | zip `skills/pcb-layout-design/` and upload it as a skill |
 
 **Python** 3.9 or newer. `gerber_check.py` needs numpy, Pillow and scipy, placement PNGs need matplotlib; everything

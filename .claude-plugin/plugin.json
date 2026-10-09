@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "description": "PCB layout design partner that checks its own work: deterministic placement checker, power-path calculators, post-route audit and Gerber-level netlist check against IPC-D-356. KiCad and EasyEDA Pro importers.",
   "author": { "name": "studio-edul" },
-  "repository": "https://github.com/studio-edul/pcb-layout-design",
+  "repository": "https://github.com/studio-edul/pcb-layout-skill",
   "license": "MIT",
   "keywords": ["pcb", "layout", "placement", "kicad", "easyeda", "jlcpcb", "gerber", "dfm", "hardware", "electronics"]
 }
