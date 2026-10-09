@@ -55,8 +55,9 @@ How it relates to other projects (October 2026):
 | Gemini CLI | `gemini skills install https://github.com/studio-edul/pcb-layout-skill --path skills/pcb-layout-design --consent` |
 | claude.ai / API | zip `skills/pcb-layout-design/` and upload it as a skill |
 
-**Python** 3.9 or newer. `gerber_check.py` needs numpy, Pillow and scipy, placement PNGs need matplotlib; everything
-else is standard library: `pip install -r requirements.txt`.
+**Python** 3.9 or newer. `gerber_check.py` needs numpy, Pillow and scipy, placement PNGs need matplotlib, and the
+impedance calculator uses numpy and scipy for its field solver (closed-form fallback without them); everything else is
+standard library: `pip install -r requirements.txt`.
 
 ## Try it
 
@@ -79,9 +80,10 @@ ERROR OVERLAP U1-C1 0.25 mm
 ERROR EDGE C3 1.95 < 2.5 mm
 ERROR KEEPOUT U1 in 'antenna'
 ERROR FAR C3->U2 7.61 > 2.0 mm (buck input cap hot loop)
+WARN  EDGE U1 side 2.25 mm from the edge, inside the 2.5 mm band: a side either reaches the edge or keeps the band (pad-derived courtyards: extend it to the body edge)
 WARN  ROT R1 45 deg (use 90 deg steps)
-INFO top occupancy 65% of usable area (dense; 44% of the whole board; usable = board - edge band - keep-outs)
-SUMMARY ERROR 6, WARN 5
+INFO top occupancy 65% of usable area (dense; 45% of the whole board; usable = board - edge band - keep-outs)
+SUMMARY ERROR 6, WARN 6
 ```
 ![placement checker output](examples/placement/placement_bad.png)
 
@@ -108,7 +110,7 @@ Run from `skills/pcb-layout-design/`; every Python script has `--help`.
 | `scripts/placement_from_kicad.py` | `.kicad_pcb` (KiCad 6-9 syntax; the older `module` form is read too) -> placement JSON |
 | `scripts/placement_from_easyeda.js` | board open in EasyEDA Pro -> placement JSON (runs inside the client) |
 | `scripts/baseline_diff.py` | two placement JSONs -> locked parts that moved, turned, flipped, resized or vanished; board extent and keep-out changes |
-| `scripts/pcbcalc.py` | trace width, via current, microstrip / stripline / differential impedance, LDO thermal, buck inductor, RC, divider, power budget |
+| `scripts/pcbcalc.py` | trace width, via current, microstrip / differential impedance (2D field solver with copper and solder mask when numpy + scipy are installed), stripline, LDO thermal, buck inductor, RC, divider, power budget |
 | `scripts/gerber_check.py` | `layers`, `render`, `netcheck --ipc`, `diff` on Gerber RS-274X + Excellon (EasyEDA, KiCad, Protel names, X2 attributes, mm and inch) |
 | `scripts/audit_release.py` | release folder or zip: required layers, file structure, BOM / CPL consistency |
 

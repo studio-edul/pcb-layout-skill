@@ -4,11 +4,12 @@ ERROR OVERLAP C1-C2 0.20 mm
 ERROR EDGE C3 1.95 < 2.5 mm
 ERROR KEEPOUT U1 in 'antenna'
 ERROR FAR C3->U2 7.61 > 2.0 mm (buck input cap hot loop)
+WARN  EDGE U1 side 2.25 mm from the edge, inside the 2.5 mm band: a side either reaches the edge or keeps the band (pad-derived courtyards: extend it to the body edge)
 WARN  GRID C1 (17.2, 15) not on 0.25 mm
 WARN  GRID C2 (17.2, 16.1) not on 0.25 mm
 WARN  GRID L1 (7, 9.3) not on 0.25 mm
 WARN  GRID R1 (10.13, 20) not on 0.25 mm
 WARN  ROT R1 45 deg (use 90 deg steps)
-INFO top occupancy 65% of usable area (dense; 44% of the whole board; usable = board - edge band - keep-outs)
-SUMMARY ERROR 6, WARN 5
+INFO top occupancy 65% of usable area (dense; 45% of the whole board; usable = board - edge band - keep-outs)
+SUMMARY ERROR 6, WARN 6
 INFO PNG written: placement_bad.png

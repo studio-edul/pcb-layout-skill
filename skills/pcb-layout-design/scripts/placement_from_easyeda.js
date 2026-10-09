@@ -56,12 +56,14 @@ for (const c of comps) {
   const m = margin / MM;
   x0 -= m; x1 += m; y0 -= m; y1 += m;
   const ox = (x0 + x1) / 2, oy = (y0 + y1) / 2, r = rot * Math.PI / 180;        // courtyard centre back to the board frame
-  const w = (x1 - x0) * MM, h = (y1 - y0) * MM, ref = c.getState_Designator() || '?';
   const odd = rot % 90 !== 0;
+  const lw = (x1 - x0) * MM, lh = (y1 - y0) * MM, cosr = Math.abs(Math.cos(r)), sinr = Math.abs(Math.sin(r));
+  const w = odd ? lw * cosr + lh * sinr : lw, h = odd ? lw * sinr + lh * cosr : lh;   // odd angle: box around the rotated courtyard
+  const ref = c.getState_Designator() || '?';
   parts.push({
     ref, x: +((cx + ox * Math.cos(r) - oy * Math.sin(r)) * MM).toFixed(4), y: +((cy + ox * Math.sin(r) + oy * Math.cos(r)) * MM).toFixed(4),
     w: +w.toFixed(4), h: +h.toFixed(4), rot: odd ? 0 : rot, class: guess(ref, w * h),
-    side: c.getState_Layer() === 2 ? 'bottom' : 'top', note: odd ? `rotation ${rot} deg: courtyard taken axis-aligned` : 'pads+' + margin,
+    side: c.getState_Layer() === 2 ? 'bottom' : 'top', note: odd ? `rotation ${rot} deg: bounding box of the rotated courtyard` : 'pads+' + margin,
     ...(odd ? { rot_actual: rot } : {}),
   });
 }

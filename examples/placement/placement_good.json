@@ -2,7 +2,7 @@
  "zones":{"power":[0,0,14,30],"digital":[14,0,40,30]},
  "keepouts":[{"name":"antenna","rect":[22,24,40,30],"allow":["U1"]}],
  "parts":[
-  {"ref":"U1","x":30.5,"y":15.75,"w":18,"h":25.5,"class":"module","zone":"digital","allow_overhang":true},
+  {"ref":"U1","x":31,"y":17.25,"w":18,"h":25.5,"class":"module","zone":"digital","allow_overhang":true},
   {"ref":"C1","x":20.5,"y":15,"w":2.1,"h":1.3,"rot":90,"class":"passive","zone":"digital"},
   {"ref":"C2","x":20.5,"y":18,"w":2.1,"h":1.3,"rot":90,"class":"passive","zone":"digital"},
   {"ref":"U2","x":8,"y":15,"w":4,"h":3.6,"class":"power","zone":"power"},

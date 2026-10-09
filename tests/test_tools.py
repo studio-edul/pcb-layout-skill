@@ -40,9 +40,10 @@ class PlacementCheck(unittest.TestCase):
     def test_bad_layout_reports_every_rule(self):
         rc, out = run_script("placement_check.py", DATA / "placement_bad.json")
         self.assertEqual(rc, 1)
-        self.assertIn("SUMMARY ERROR 6, WARN 5", out)
+        self.assertIn("SUMMARY ERROR 6, WARN 6", out)
         for kind in ("OVERLAP", "EDGE", "KEEPOUT", "FAR", "GRID", "ROT"):
             self.assertIn(kind, out)
+        self.assertIn("WARN  EDGE U1 side 2.25 mm from the edge", out)          # module neither at the edge nor clear
 
     def test_help_does_not_need_a_file(self):
         rc, out = run_script("placement_check.py", "--help")
@@ -57,7 +58,32 @@ class PlacementCheck(unittest.TestCase):
     def test_occupancy_is_on_usable_area(self):
         _, out = run_script("placement_check.py", DATA / "placement_bad.json")
         # 40 x 30 board, 2.5 mm edge band, 18 x 3.5 mm of the antenna keep-out inside it -> about 65 %, "dense"
-        self.assertIn("top occupancy 65% of usable area (dense; 44% of the whole board", out)
+        self.assertIn("top occupancy 65% of usable area (dense; 45% of the whole board", out)
+
+    def check(self, parts, **board):
+        mod = load("placement_check")
+        d = {"board": {"w": 40, "h": 30, "edge_clearance": 2.5, "grid": 0.25, **board}, "parts": parts}
+        errs, warns, *_ = mod.check(d)
+        return errs, warns, mod
+
+    def test_rotated_part_uses_the_rotated_box(self):
+        mod = load("placement_check")
+        x1, y1, x2, y2 = mod.rect({"x": 10, "y": 10, "w": 2.1, "h": 1.3, "rot": 45})
+        self.assertAlmostEqual(x2 - x1, 3.4 / 2 ** 0.5, places=6)           # (2.1 + 1.3) cos 45
+        errs, _, _ = self.check([{"ref": "R1", "x": 10, "y": 10, "w": 2.1, "h": 1.3, "rot": 45, "class": "passive"},
+                                 {"ref": "R2", "x": 11.4, "y": 10, "w": 0.5, "h": 0.5, "class": "passive"}])
+        self.assertTrue(any(e.startswith("OVERLAP R1-R2") for e in errs), errs)   # missed with the 0 deg box
+
+    def test_edge_parts_reach_the_edge_or_keep_the_band(self):
+        mod_part = {"ref": "U1", "w": 18, "h": 10, "class": "module"}
+        _, warns, _ = self.check([dict(mod_part, x=31, y=25)])                 # flush right + top
+        self.assertEqual(warns, [])
+        _, warns, _ = self.check([dict(mod_part, x=30.5, y=25)])               # top flush, right side 0.5 mm in
+        self.assertTrue(any("EDGE U1 side 0.50 mm" in w for w in warns), warns)
+        errs, warns, _ = self.check([dict(mod_part, x=20, y=15)])               # well inside: fine
+        self.assertEqual((errs, warns), ([], []))
+        _, warns, _ = self.check([{"ref": "H1", "x": 3, "y": 3, "w": 5, "h": 5, "class": "mech"}])
+        self.assertEqual(warns, [])                                             # holes keep their exemption
 
     def test_bundled_example_is_clean(self):
         rc, out = run_script("placement_check.py", ROOT / "skills" / "pcb-layout-design" / "assets" / "placement_example.json")
@@ -77,6 +103,58 @@ class PcbCalc(unittest.TestCase):
     def test_via_current(self):
         d = self.calc("via-current", "--hole-mm", "0.3", "--plating-um", "20")
         self.assertAlmostEqual(d["single_via_capacity_a"], 0.53, delta=0.02)
+
+    def test_microstrip_closed_form(self):
+        base = ("diff-microstrip", "--width-mm", "0.29", "--spacing-mm", "0.2", "--height-mm", "0.2104", "--er", "4.4",
+                "--model", "closed")
+        thin = self.calc(*base, "--copper-um", "0")
+        self.assertAlmostEqual(thin["zdiff_ohm"], 97.3, delta=0.1)            # v1.1.0 zero-thickness value
+        thick = self.calc(*base)
+        self.assertLess(thick["zdiff_ohm"], thin["zdiff_ohm"] - 3)             # 35 um copper lowers it
+        self.assertIn("thickness correction", thick["model"])
+
+    @unittest.skipUnless(load("pcbcalc").have_field_solver(), "needs numpy and scipy")
+    def test_microstrip_field_solver(self):
+        se = self.calc("microstrip", "--width-mm", "0.4", "--height-mm", "0.2104", "--er", "4.4", "--copper-um", "0",
+                       "--mask-um", "0")
+        self.assertEqual(se["model"], "2D field solver")
+        self.assertAlmostEqual(se["z0_ohm"], 50.2, delta=0.5)                 # Hammerstad-Jensen 50.21
+        d = self.calc("diff-microstrip", "--target-ohm", "90", "--spacing-mm", "0.2", "--height-mm", "0.2104",
+                      "--er", "4.4")
+        self.assertAlmostEqual(d["zdiff_ohm"], 90, delta=0.3)
+        self.assertAlmostEqual(d["width_mm"], 0.288, delta=0.01)              # 35 um copper, 20 um mask
+
+    def test_closed_form_value_and_keys(self):
+        d = self.calc("microstrip", "--width-mm", "0.36", "--height-mm", "0.2104", "--er", "4.4", "--model", "closed")
+        self.assertAlmostEqual(d["z0_ohm"], 50.93, delta=0.05)                # Hammerstad-Jensen, 35 um copper
+        self.assertFalse(d["inputs"]["mask_modelled"])
+        p = self.calc("diff-microstrip", "--width-mm", "0.29", "--spacing-mm", "0.2", "--height-mm", "0.2104", "--er",
+                      "4.4", "--model", "closed")
+        self.assertEqual(set(p) >= {"zdiff_ohm", "z_odd_ohm", "z_common_ohm", "e_eff", "delay_ps_per_mm"}, True)
+
+    def test_impedance_rejects_bad_inputs(self):
+        for bad in (("--height-mm", "-0.2"), ("--height-mm", "nan"), ("--er", "0.5"), ("--mask-er", "0")):
+            args = {"--width-mm": "0.3", "--spacing-mm": "0.2", "--height-mm": "0.2104", "--er": "4.4"}
+            args[bad[0]] = bad[1]
+            rc, out = run_script("pcbcalc.py", "diff-microstrip", *[x for kv in args.items() for x in kv], "--json")
+            self.assertEqual(rc, 2, (bad, out))
+
+    def test_auto_model_names_what_it_used(self):
+        d = self.calc("microstrip", "--width-mm", "0.36", "--height-mm", "0.2104", "--er", "4.4")
+        self.assertEqual(d["model"] == "2D field solver", load("pcbcalc").have_field_solver())
+
+    @unittest.skipUnless(load("pcbcalc").have_field_solver(), "needs numpy and scipy")
+    def test_field_solver_physics(self):
+        base = ("--height-mm", "0.2104", "--er", "4.4")
+        bare = self.calc("microstrip", "--width-mm", "0.36", *base, "--mask-um", "0")
+        coated = self.calc("microstrip", "--width-mm", "0.36", *base)
+        self.assertLess(coated["z0_ohm"], bare["z0_ohm"] - 1)                  # mask lowers the impedance
+        self.assertTrue(coated["inputs"]["mask_modelled"])
+        wide = self.calc("diff-microstrip", "--width-mm", "0.36", "--spacing-mm", "5", *base)
+        self.assertAlmostEqual(wide["zdiff_ohm"], 2 * coated["z0_ohm"], delta=0.02 * wide["zdiff_ohm"])
+        self.assertGreater(wide["z_common_ohm"], 0)
+        thick = self.calc("microstrip", "--target-ohm", "50", "--height-mm", "1.5", "--er", "4.5")   # 2-layer core
+        self.assertAlmostEqual(thick["z0_ohm"], 50, delta=0.3)
 
     def test_divider(self):
         d = self.calc("voltage-divider", "--vin", "24", "--r-top-ohm", "100000", "--r-bottom-ohm", "6800")

@@ -42,7 +42,8 @@ Check: `python scripts/pcbcalc.py ldo --help` for LDO margin with Ta and theta_J
 - Plane sheet resistance: 1 oz 0.5 mOhm per square, 0.5 oz 1 mOhm per square (JLC 4-layer inner layers are 0.5 oz
   unless ordered otherwise). Every power path gets a rating table (`routing_review.md` section 2).
 - Buck inductor: L = (Vin - Vout) x Vout / (Vin x fsw x dI), dI = 20-40 % of Iout(max).
-- Microstrip impedance (IPC-2141): Z0 = 87 / sqrt(er + 1.41) x ln(5.98 h / (0.8 w + t)).
+- Microstrip impedance (IPC-2141, rough): Z0 = 87 / sqrt(er + 1.41) x ln(5.98 h / (0.8 w + t)). For widths use
+  `pcbcalc.py microstrip` / `diff-microstrip`, which solve the field with copper thickness and solder mask.
 - Stepper driver loss: P ~ 2 x Irms^2 x Rds(on)(HS+LS); TMC2240 0.23 ohm at 1.5 A RMS -> ~1.0 W.
 
 ## Where the heat leaves, where a heatsink goes

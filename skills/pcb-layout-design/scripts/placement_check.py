@@ -15,10 +15,12 @@ Input JSON (mm, origin = board lower-left unless "origin" says otherwise, y up):
 }
 ERROR: OVERLAP, SPACING, EDGE, OUTSIDE, KEEPOUT, FAR, CLOSE, ZONE.  WARN: grid, rotation.
 INFO: occupancy per side = courtyard sum / usable area (board - edge band - keep-outs), with the SKILL.md verdict.
-Classes connector, module and mech are exempt from the EDGE rule (edge connectors, antenna-edge modules, holes);
-check a module's antenna edge yourself or model its antenna area as a keep-out with "allow": [<module ref>].
+Classes connector, module and mech are exempt from the EDGE rule (edge connectors, antenna-edge modules, holes).
+For a connector or module each side is either at the edge (within 0.25 mm) or keeps the band; a side in between is a
+WARN. Model a module's antenna area as a keep-out with "allow": [<module ref>].
 Exit code 1 if any ERROR.  --png out.png draws the board (violating parts red).
-Rotation must be 0 / 90 / 180 / 270: any other angle is checked as rot 0 (axis-aligned courtyard) and warned.
+Rotation should be 0 / 90 / 180 / 270: any other angle is checked with the bounding box of the rotated courtyard and
+warned.
 """
 import json, math, sys, itertools
 
@@ -30,12 +32,14 @@ SPACING = {
     "connector-connector": 1.0,
 }
 EDGE_EXEMPT = {"connector", "module", "mech"}
+AT_EDGE = 0.25          # a connector / module this close to the board edge counts as an edge part
 
 
 def rect(p):
-    w, h = p["w"], p["h"]
-    if int(round(p.get("rot", 0))) % 180 == 90:
-        w, h = h, w
+    """axis-aligned box of the courtyard; for angles that are not 90 deg steps, the box around the rotated courtyard"""
+    a = math.radians(p.get("rot", 0) or 0)
+    c, s = abs(math.cos(a)), abs(math.sin(a))
+    w, h = p["w"] * c + p["h"] * s, p["w"] * s + p["h"] * c
     return (p["x"] - w / 2, p["y"] - h / 2, p["x"] + w / 2, p["y"] + h / 2)
 
 
@@ -103,10 +107,15 @@ def check(d):
         x1, y1, x2, y2 = R[r]
         if (x1 < bx[0] - 1e-6 or y1 < bx[1] - 1e-6 or x2 > bx[2] + 1e-6 or y2 > bx[3] + 1e-6) and not p.get("allow_overhang"):
             errs.append(f"OUTSIDE {r}"); bad.add(r); continue
+        e = min(x1 - bx[0], y1 - bx[1], bx[2] - x2, bx[3] - y2)
         if p.get("class") not in EDGE_EXEMPT and not p.get("allow_overhang"):
-            e = min(x1 - bx[0], y1 - bx[1], bx[2] - x2, bx[3] - y2)
             if e < ec - 1e-6:
                 errs.append(f"EDGE {r} {e:.2f} < {ec} mm"); bad.add(r)
+        elif p.get("class") in ("connector", "module"):
+            mid = [dist for dist in (x1 - bx[0], y1 - bx[1], bx[2] - x2, bx[3] - y2) if AT_EDGE < dist < ec - 1e-6]
+            if mid:
+                warns.append(f"EDGE {r} side {min(mid):.2f} mm from the edge, inside the {ec} mm band: a side either "
+                             f"reaches the edge or keeps the band (pad-derived courtyards: extend it to the body edge)")
         zn = p.get("zone")
         if zn and zn in d.get("zones", {}):
             z = d["zones"][zn]
@@ -115,7 +124,7 @@ def check(d):
         g_ = p.get("grid", grid)
         if not (on_grid(p["x"], g_) and on_grid(p["y"], g_)):
             warns.append(f"GRID {r} ({p['x']}, {p['y']}) not on {g_} mm")
-        if int(round(p.get("rot", 0))) % 90 != 0:
+        if int(round(p.get("rot") or 0)) % 90 != 0:
             warns.append(f"ROT {r} {p.get('rot')} deg (use 90 deg steps)")
         if p.get("height", 0) > 5:
             low = [o for o in parts if o != r and parts[o].get("height", 1) <= 2 and gap(R[r], R[o]) < 1.0]

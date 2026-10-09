@@ -3,6 +3,23 @@
 Versions follow [semantic versioning](https://semver.org). The version is set in
 `skills/pcb-layout-design/SKILL.md` (`metadata.version`) and `.claude-plugin/plugin.json`; bump both.
 
+## 1.1.1 - 2026-10-09
+
+Fixes found by running the skill against another PCB skill on the same four tasks.
+- `scripts/placement_check.py`: parts at angles that are not 90 deg steps are checked with the box around the rotated
+  courtyard (a 45 deg 0805 was checked as 2.1 x 1.3 mm instead of 2.4 x 2.4 mm). Connectors and modules keep their
+  edge-rule exemption only where a side reaches the edge: a side inside the edge band but short of the edge is a WARN
+  (a module 2.25 mm from both edges of a 2.5 mm band passed before). The bundled example's module now sits flush.
+- `scripts/placement_from_easyeda.js`: parts at odd angles get the box around the rotated courtyard, as the KiCad
+  importer already did.
+- `scripts/pcbcalc.py microstrip` / `diff-microstrip`: a 2D field solver with copper thickness and solder mask when
+  numpy and scipy are installed (`--copper-um`, `--mask-um`, `--mask-er`, `--model`); otherwise Hammerstad-Jensen
+  with a thickness correction, and the output says which model ran. The old zero-thickness estimate read 8-15 % high
+  on a masked JLC 4-layer stackup: 90 ohm on 0.2104 mm prepreg with 0.20 mm spacing is 0.288 mm wide, not 0.334 mm.
+  Inputs are validated (height, permittivities, NaN), and both models return the same output keys.
+- `SKILL.md`: reviews and checker `why` fields give a rule ID together with what it requires, because the reader does
+  not have the rule table; the edge rule for connectors and modules is described as the checker applies it.
+
 ## 1.1.0 - 2026-10-09
 
 Late changes to a laid-out board, from the stepper-driver board's mistakes.

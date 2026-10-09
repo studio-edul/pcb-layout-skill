@@ -11,11 +11,11 @@ description: >-
   EDA API. Also for Korean requests such as PCB 배치, 레이아웃 리뷰, 선폭 계산, 거버 검사.
 license: MIT
 compatibility: >-
-  Python 3.9+. scripts/gerber_check.py needs numpy, Pillow and scipy; placement PNGs need matplotlib; the other
-  scripts use the standard library. Works with any EDA tool; KiCad and EasyEDA Pro importers included.
+  Python 3.9+. scripts/gerber_check.py needs numpy, Pillow and scipy; placement PNGs need matplotlib; the
+  impedance field solver in pcbcalc.py uses numpy and scipy when present; everything else is standard library. Works with any EDA tool; KiCad and EasyEDA Pro importers included.
 metadata:
   author: studio-edul
-  version: "1.1.0"
+  version: "1.1.1"
 ---
 
 # PCB layout design
@@ -27,7 +27,7 @@ Scripts (run from this skill's directory; every Python script prints `--help`):
 | `scripts/placement_from_kicad.py` | `.kicad_pcb` -> placement JSON skeleton (courtyards, sides, classes) |
 | `scripts/placement_from_easyeda.js` | same for the board open in EasyEDA Pro (run inside the client) |
 | `scripts/baseline_diff.py` | baseline vs current placement JSON -> locked parts, board extent or keep-outs that changed |
-| `scripts/pcbcalc.py` | trace width, via current, microstrip / stripline / differential impedance, LDO heat, buck inductor, RC, divider, power budget |
+| `scripts/pcbcalc.py` | trace width, via current, microstrip / differential impedance (2D field solver with copper and solder mask), stripline, LDO heat, buck inductor, RC, divider, power budget |
 | `scripts/gerber_check.py` | fabrication files: `layers`, `render` (print preview, silk on pads, copper to edge), `netcheck` (copper + plated holes vs IPC-D-356: shorts, opens), `diff` (two releases) |
 | `scripts/audit_release.py` | release folder / zip: required layers, Gerber / Excellon structure, BOM / CPL consistency |
 
@@ -139,12 +139,13 @@ connector-anything 1.0 (THT pins 1.5 for the iron); tall (> 5 mm) parts +1 mm.
 Checker classes: passive / power / ic / module / connector / mech.
 
 **Edges:** copper 0.4 mm (pour 0.5; never < 0.3), SMD pad 0.8 mm, body 0.5 mm for assembly without rails; 2.5 mm if
-the assembler needs rails. The checker exempts classes connector, module and mech from this rule (edge-hanging
-USB-C, antenna-edge modules, holes): check those edges yourself, and tell the fab about overhangs
+the assembler needs rails. For connectors and modules (edge-hanging USB-C, antenna-edge modules) the checker
+asks each side to reach the edge or keep the band; holes (mech) are exempt. Tell the fab about overhangs
 (`references/jlcpcb_ordering.md`).
 
 ## 5. Block rules -> near / apart entries (edge-to-edge)
-Cite the rule ID in reviews and in the checker's `why` field.
+In reviews and in the checker's `why` field write the rule ID together with what it requires ("B9: TVS within 5 mm of
+the connector pin") - the reader does not have this table.
 | ID | block | rule |
 |---|---|---|
 | B1 | 100 nF decoupling | <= 1.0 mm from the pin pair; 1 uF <= 3 mm; 10 uF <= 5 mm; bulk <= 15 mm; cap -> via <= 0.5 mm |
@@ -217,7 +218,7 @@ Python script).
 - **Design:** assumptions, occupancy %, zone table, coordinate table (ref, x, y, rot, side), checker summary,
   risks, next action.
 - **Review:** findings first, most severe first:
-  `[Critical|Major|Minor|Question] title / Evidence (measured vs required, rule ID, source) / Impact / Fix / Confidence`.
+  `[Critical|Major|Minor|Question] title / Evidence (measured vs required, rule ID with its meaning, source) / Impact / Fix / Confidence`.
   Order: manufacturing blockers -> power & thermal -> return paths & SI -> EMC -> mechanical -> test / service ->
   compliance / lifecycle. Evidence ladder: measurement > datasheet / reference design > fab capability > standard >
   project rule > heuristic (label heuristic-only findings). Rule precedence: user requirement & safety > datasheet

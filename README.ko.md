@@ -52,7 +52,7 @@
 | claude.ai / API | `skills/pcb-layout-design/`를 zip으로 묶어 스킬로 업로드 |
 
 **Python** 3.9 이상이 필요합니다.
-- `gerber_check.py`에는 numpy, Pillow, scipy가 필요하고, 배치 PNG에는 matplotlib이 필요합니다. 나머지는 표준 라이브러리만 씁니다.
+- `gerber_check.py`에는 numpy, Pillow, scipy가 필요하고, 배치 PNG에는 matplotlib이 필요합니다. `pcbcalc.py`의 임피던스 계산은 numpy와 scipy가 있으면 전자기장 계산을, 없으면 근사식을 씁니다. 나머지는 표준 라이브러리만 씁니다.
 - 한 번에 설치하려면 `pip install -r requirements.txt`를 실행하세요.
 
 ## 이렇게 시켜 보세요
@@ -76,7 +76,7 @@
 | `scripts/placement_from_kicad.py` | `.kicad_pcb` (KiCad 6~9 문법, 옛 `module` 형식도 읽음) → 배치 JSON |
 | `scripts/placement_from_easyeda.js` | EasyEDA Pro에 열린 보드 → 배치 JSON (EasyEDA 안에서 실행) |
 | `scripts/baseline_diff.py` | 배치 JSON 두 개 비교 → 고정(locked) 부품이 움직이거나 돌거나 뒤집히거나 크기가 바뀌거나 사라졌는지, 보드 크기·금지 영역 변화 |
-| `scripts/pcbcalc.py` | 선폭, 비아 전류, 임피던스, LDO 발열, 벅 인덕터, RC, 분압, 전력 예산 |
+| `scripts/pcbcalc.py` | 선폭, 비아 전류, 임피던스(numpy·scipy가 있으면 동박 두께와 솔더마스크까지 넣은 2D 전자기장 계산), LDO 발열, 벅 인덕터, RC, 분압, 전력 예산 |
 | `scripts/gerber_check.py` | Gerber RS-274X·Excellon의 `layers`, `render`, `netcheck --ipc`, `diff` (EasyEDA·KiCad·Protel 이름, X2 속성, mm·inch) |
 | `scripts/audit_release.py` | 릴리스 폴더나 zip: 필수 레이어, 파일 구조, BOM / CPL 일치 |
 
