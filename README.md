@@ -1,4 +1,4 @@
-# pcb-layout-design
+# pcb-layout-skill
 
 **A PCB layout skill for AI coding agents that checks its own work.** It turns datasheet-style block rules into numbers,
 runs a deterministic placement checker before any coordinate reaches your EDA tool, sizes power paths by calculation,
