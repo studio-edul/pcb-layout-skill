@@ -1,21 +1,23 @@
 # Post-route audit, power-path rating, connector fan-out, rework workflow (pcb-layout-design)
 
-Learned on a 42 x 42 mm 4-layer stepper-driver board (24 V daisy chain over USB-C, 5 A pass-through, routed with
-EasyEDA Pro + Freerouting + a grid router). **DRC 0 only proves clearance and connectivity.** Every item below was
-wrong on a DRC-clean board. The numbers in the tables are that board's - use them as a pattern, not as limits.
+**DRC 0 only proves clearance and connectivity.** The checks below apply to any routed board. What they found comes
+from one example board: a 42 x 42 mm 4-layer stepper driver (24 V daisy chain over USB-C, 5 A pass-through, routed
+with EasyEDA Pro + Freerouting + a grid router), where every item was wrong on a DRC-clean board. Its numbers - the
+"found on the example board" column, the worked example in section 2, the USB-C template in section 4 - are a
+pattern, not limits.
 
 Contents: 1 audit of a routed board - 2 power-path rating table - 3 inner power planes - 4 USB-C 16P fan-out -
 5 switching regulator as routed - 6 rework workflow (simulate, then apply) - 7 the visual pass
 
 ## 1. Audit of a routed board (autorouter output is a draft)
-| check | how | what was found |
+| check | how | found on the example board |
 |---|---|---|
 | satellite reaches its pin the short way | routed length between the two pads vs straight distance; > 3x is a finding | LDO input cap 0.2 mm under its pin fed through a 40 mm loop; buck FB / RT resistors under their pins fed by 17 mm loops; eFuse dV/dt cap 2 mm from its pin through a via 6 mm away |
 | power left at signal width | width and via count of every segment of every power net | 5 A pass-through on 0.2 mm with 2 vias; bulk cap on one 0.15 mm stub and one via; MOSFET source on 0.15 mm |
 | ground returns | every power part, bulk / output cap, TVS and ESD array has its own via at the pad | TVS, LDO, bulk cap and buck output cap grounds daisy-chained on one 0.2 mm track; ESD array grounded by the pour only |
 | copper under connector shells | component-side tracks and any via inside the shell outline | 31 tracks and 5 vias under three USB-C shells |
 | vias in pad rows | via overlapping or between pads of a part | vias between SO-8 pads; via partly in an 0402 pad |
-| noisy net beside a sensitive pin | SW / BOOT / motor outputs vs FB, crystal, ADC, sense lines | BOOT 0.15 mm from the buck FB pin, FB routed between the pads of the boot cap |
+| noisy net beside a sensitive pin | SW / BOOT, motor / class-D / relay outputs vs FB, crystal, ADC, sense lines, antenna feed | BOOT 0.15 mm from the buck FB pin, FB routed between the pads of the boot cap |
 | detours | net length vs pad-to-pad distance, via count per net | CAN low 84 mm with 6 vias around the motor connector |
 | plane damage (section 3) | signal tracks on the plane layer, pockets, necks, via fences | bulk-cap vias in a pocket behind a signal track (0.5 mm neck) |
 | track angles | segments that are not 0 / 45 / 90 deg | 17 skewed pad-entry stubs |
@@ -37,7 +39,7 @@ smallest value as the rating of the path. Do not size via arrays or planes by fe
   (heuristic - say so).
 - JLC 4-layer default inner copper is 0.5 oz: either order 1 oz inner or share the current with outer copper.
 
-Worked example (this board, eFuse limit 5 A). First pass sized by feel, second pass by the table:
+Worked example (the example board, eFuse limit 5 A). First pass sized by feel, second pass by the table:
 | element | first pass | pcbcalc 10 / 20 C | second pass | pcbcalc 10 / 20 C |
 |---|---|---|---|---|
 | J1 VBUS vias (2.5 A per pad pair) | 3 + 3 | 1.6 / 2.2 A per side | 6 + 5 | 3.2 / 4.4 and 2.7 / 3.6 A |
@@ -66,7 +68,7 @@ connector-side parts, and reserve the via rows.
 - Decide the plane partition together with the connector and via-field positions: the data-pin via field of a
   connector sits between its VBUS vias, so the plane needs a corridor under the pad row / shell.
 
-## 4. USB-C 16P receptacle used for power + one data pair (0.5 mm pad pitch, 0.61 mm vias, 0.15 mm tracks)
+## 4. USB-C 16P receptacle used for power + one data pair (example board: 0.5 mm pad pitch, 0.61 mm vias, 0.15 mm tracks)
 No vias and no component-side copper under the shell; everything escapes inboard of the pad row.
 Why a template: a track that passes the via of the neighbouring pad has 0.117 mm (4.6 mil) left - below the rule,
 so vias are staggered and two tracks jog. u = along the row from the centre, v = inboard from the pad centres, mil.
@@ -103,8 +105,8 @@ A leaves the field at (9.8, 100), B on the outer side of its link; smallest gap 
    split segments, leftovers appear).
 6. Rebuild pours, reopen the document, run DRC; then section 1 again.
 7. Part pins and interchangeable signals are design variables: re-assign MCU pins so each bus leaves on the side
-   that faces its target, swap motor phase polarity / CC1-CC2 / array channels to uncross, and write the result
-   into the spec for firmware.
+   that faces its target, swap interchangeable signals (CC1-CC2, ESD-array channels, motor phase polarity) to
+   uncross, check each move against `late_changes.md` section 3, and write the result into the spec for firmware.
 
 How to run these checks: most need a dump of the routed board from your EDA tool (tracks, vias, pads with nets,
 pour fills) and a short script per check - length per net, width and via count per power segment, vias inside
@@ -113,8 +115,8 @@ alone (shorts / opens against the netlist, copper to edge, smallest gap between 
 `scripts/gerber_check.py`.
 
 ## 7. The visual pass
-The person receiving the board looks at the 2D view, the 3D view and the fab's preview; on this board they caught
-things every script had passed. Before reporting, look the same way:
+The person receiving the board looks at the 2D view, the 3D view and the fab's preview; on the example board they
+caught things every script had passed. Before reporting, look the same way:
 - **Each copper layer alone, then both sides in 3D.** Found that way: a screw terminal whose wire entries faced into
   the board (footprint turned 180 deg), tracks and vias under USB-C shells, unconnected-pad markers, a part sitting on
   the wrong side.

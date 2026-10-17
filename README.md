@@ -19,10 +19,10 @@ between the datasheet and the layout and does not trust the model's arithmetic:
 
 | | this skill |
 |---|---|
-| **Before layout** | Block rules (decoupling, buck hot loop, crystal, motor driver, eFuse, connector ESD, USB-C, CAN) become numeric near / apart limits with rule IDs. `placement_check.py` must report ERROR 0 before coordinates go to the EDA tool. |
+| **Before layout** | Block rules (decoupling, buck / boost, crystal, motor driver, eFuse, Li-ion charger, LED driver, relay, op-amp, audio, RF module, Ethernet, I2C, connector ESD, USB-C, CAN) become numeric near / apart limits with rule IDs. `placement_check.py` must report ERROR 0 before coordinates go to the EDA tool. |
 | **During layout** | Trace width, via current, impedance, LDO heat and buck inductor from `pcbcalc.py`; every power path gets a rating table naming its weakest element. |
 | **After routing** | A post-route audit for what DRC cannot see: power left at signal width, daisy-chained grounds, vias under connector shells, plane necks and via fences, noisy nets beside FB / crystal pins. |
-| **Late changes** | Parts the user fixed are marked `"locked"` in a baseline file; after a part swap, a sync or a bulk move `baseline_diff.py` reports which of them, the board extent or a keep-out changed. Moving MCU signals follows what an STM32G431 board taught. |
+| **Late changes** | Parts the user fixed are marked `"locked"` in a baseline file; after a part swap, a sync or a bulk move `baseline_diff.py` reports which of them, the board extent or a keep-out changed. Moving MCU signals follows a checklist for any MCU, with STM32G431 and ESP32 examples. |
 | **Before ordering** | `gerber_check.py` rebuilds connectivity from the Gerber copper and plated holes and compares it with the IPC-D-356 netlist (shorts, opens), renders what the fab will print, and diffs two releases so a late change cannot hide a regression. |
 | **Where it came from** | Written while designing a real 4-layer, 42 x 42 mm stepper driver (24 V daisy chain over USB-C, 5 A pass-through). The audit tables, USB-C fan-out template, EasyEDA API traps and JLCPCB ordering notes are what that board taught. |
 

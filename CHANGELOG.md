@@ -3,6 +3,23 @@
 Versions follow [semantic versioning](https://semver.org). The version is set in
 `skills/pcb-layout-design/SKILL.md` (`metadata.version`) and `.claude-plugin/plugin.json`; bump both.
 
+## 1.2.0 - 2026-10-17
+
+Less tied to the stepper-driver board the skill was written on.
+- `SKILL.md` section 5: block rules B16-B24 - boost, Li-ion charger / protection, LED driver, relay / solenoid,
+  op-amp / precision analog, audio, RF module / antenna, Ethernet PHY / magnetics, I2C pull-ups. Each number names
+  its source (TI SLVA773, bq2408x / BQ24753A, LMC660, TPA3113D2, SNLA387; TE coil suppression; ADI; Espressif ESP32
+  hardware design guidelines; NXP UM10204) or is marked heuristic.
+- `SKILL.md` section 6: clearance by voltage after IPC-2221B Table 6-1 replaces "0.30 mm on 24 V nets"; a 2-layer
+  stackup paragraph next to the 4-layer one; "PWM / STEP" made generic.
+- `references/emc_protection.md`: the full IPC-2221B Table 6-1 with notes; Ethernet MDI routing (TI SNLA387).
+- `references/late_changes.md` section 3: a pin-move checklist for any MCU (function belongs to the pin, state before
+  firmware, connector voltage, shared resources, where the edit happens), with STM32G431 and ESP32 (strapping pins,
+  input-only pins, ADC2 and Wi-Fi; ESP32 datasheet v5.3, ESP32-WROOM-32E datasheet v2.1) as worked examples.
+- `references/power_thermal.md`, `references/routing_review.md`: the stepper-driver board is labelled as one example;
+  TMC2240 loss, CoolStep and the motor end cap moved under a worked-example heading.
+- Three evals without a motor: a 2-layer I2C sensor board, a 48 V LED board, an ESP32 module board.
+
 ## 1.1.1 - 2026-10-09
 
 Fixes found by running the skill against another PCB skill on the same four tasks.

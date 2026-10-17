@@ -24,7 +24,8 @@ Adapted from github.com/SPREsxm/claude-pcb-designer (MIT) emc-guidelines and pro
 | signal | rule |
 |---|---|
 | SPI (tens of MHz) | MOSI/SCLK matched +-2 mm; series R (~22 ohm) at the source only when the waveform needs it; <= 1 via per signal; edge gap >= 2x width to other nets (3W centre to centre); never parallel to I2C/UART > 5 mm, cross at 90 deg |
-| I2C | >= 10x width from SPI SCLK; never parallel to PWM/STEP/LED lines; weak pull-ups make it noise sensitive |
+| I2C | >= 10x width from SPI SCLK; never parallel to PWM, step / clock or LED-data lines; weak pull-ups make it noise sensitive; pull-up range in SKILL.md B24 |
+| Ethernet MDI | 100 ohm differential +-10 %, < 2 in (50 mm), matched within 20 mil (1G) / 50 mil (10/100), >= 30 mil between pairs, same-layer ground >= 3 w from the track (5 w preferred), continuous ground below, few vias; plane void only under parts on the pair (magnetics, chokes, AC caps, ESD) with about 20 mil margin; ESD on the PHY side of the magnetics, where cable-side common-mode swings cannot destroy it (TI SNLA387; magnetics and earth ground: SKILL.md B23) |
 | fast nets in general | <= 2 vias; a return path at every layer change (above); no stubs; clocks point-to-point, terminated at the driver |
 | USB HS/FS | 90 ohm differential, equal length, constant spacing, MCU-to-connector <= 50 mm, ESD at the connector |
 | CAN | keep H/L together (no impedance control needed at 1 Mbit/s over short boards), ESD at the connector, optional CMC |
@@ -40,6 +41,31 @@ less over a 0.1 mm prepreg (4-layer L1) than over a 1.5 mm core (2-layer).
 - SPI not parallel to I2C > 5 mm; fast nets have a return path at every layer change (via or capacitor).
 - ESD protection at connectors with a short path to GND.
 - No floating copper; no traces crossing split planes.
+
+## Conductor spacing by voltage (IPC-2221B Table 6-1)
+Minimum spacing in mm for the voltage between two conductors (DC or AC peak). Use the highest operating voltage of
+the rails involved, not the nominal (a "24 V" input that may see 30 V is in the 16-30 V row). Take the larger of
+this and the fab / project default. Values as reproduced by Altair's Pollex documentation; check the standard
+itself for a design that depends on one cell.
+| V | B1 internal | B2 outer uncoated <= 3050 m | B3 outer uncoated > 3050 m | B4 outer, permanent polymer coat | A5 outer, conformal coat over assembly | A6 component lead, uncoated | A7 component lead, conformal coat |
+|---|---|---|---|---|---|---|---|
+| 0-15 | 0.05 | 0.1 | 0.1 | 0.05 | 0.13 | 0.13 | 0.13 |
+| 16-30 | 0.05 | 0.1 | 0.1 | 0.05 | 0.13 | 0.25 * | 0.13 |
+| 31-50 | 0.1 | 0.6 | 0.6 | 0.13 | 0.13 | 0.4 | 0.13 |
+| 51-100 | 0.1 | 0.6 | 1.5 | 0.13 | 0.13 | 0.5 | 0.13 |
+| 101-150 | 0.2 | 0.6 | 3.2 | 0.4 | 0.4 | 0.8 | 0.4 |
+| 151-170 | 0.2 | 1.25 | 3.2 | 0.4 | 0.4 | 0.8 | 0.4 |
+| 171-250 | 0.2 | 1.25 | 6.4 | 0.4 | 0.4 | 0.8 | 0.4 |
+| 251-300 | 0.2 | 1.25 | 12.5 | 0.4 | 0.4 | 0.8 | 0.8 |
+| 301-500 | 0.25 | 2.5 | 12.5 | 0.8 | 0.8 | 1.5 | 0.8 |
+| > 500, per V above 500 | 0.0025 | 0.005 | 0.025 | 0.00305 | 0.00305 | 0.00305 | 0.00305 |
+\* Secondary sources disagree on this cell (0.25 vs 0.13 mm); 0.25 is the conservative reading.
+- Outer layers are taken as uncoated (B2): solder mask is not counted as the B4 coating here - the conservative
+  choice. Component leads and terminations are A6 (uncoated) or A7 (conformally coated).
+- These are electrical spacings on the board, not safety creepage. Mains and other hazardous voltages take
+  creepage and clearance from the product's safety standard (IEC 62368-1, IEC 60335-1, IEC 61010-1 ...) and a
+  qualified review (SKILL.md operating rule 8).
+- Project margins sit on top: the stepper-driver board ran 0.30 mm on its 24 V nets although B2 asks 0.1 mm.
 
 ## ESD / surge
 - System-level ESD: IEC 61000-4-2 (+-8 kV contact / +-15 kV air typical consumer & industrial), automotive

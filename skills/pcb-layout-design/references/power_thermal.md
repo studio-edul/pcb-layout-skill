@@ -44,10 +44,9 @@ Check: `python scripts/pcbcalc.py ldo --help` for LDO margin with Ta and theta_J
 - Buck inductor: L = (Vin - Vout) x Vout / (Vin x fsw x dI), dI = 20-40 % of Iout(max).
 - Microstrip impedance (IPC-2141, rough): Z0 = 87 / sqrt(er + 1.41) x ln(5.98 h / (0.8 w + t)). For widths use
   `pcbcalc.py microstrip` / `diff-microstrip`, which solve the field with copper thickness and solder mask.
-- Stepper driver loss: P ~ 2 x Irms^2 x Rds(on)(HS+LS); TMC2240 0.23 ohm at 1.5 A RMS -> ~1.0 W.
 
 ## Where the heat leaves, where a heatsink goes
-- Exposed-pad packages (QFN, TQFN, DFN, HTSSOP - motor drivers, bucks, eFuses): the heat leaves through the EP
+- Exposed-pad packages (QFN, TQFN, DFN, HTSSOP - motor and LED drivers, bucks, chargers, eFuses): the heat leaves through the EP
   into the board; the path through the mould to the package top is far worse (take theta_JC top / bottom from the
   datasheet). The cooling system is: EP solder joint -> via array -> L2 plane + copper on the opposite side.
 - Heatsink position, best first:
@@ -59,18 +58,27 @@ Check: `python scripts/pcbcalc.py ldo --help` for LDO margin with Ta and theta_J
      unless every neighbour is lower than the package top (a 0.8 mm TQFN sits lower than 0805 / 1206 MLCCs).
   3. Air across the board: forced air lowers board-to-ambient resistance more than a small heatsink in still air
      (heuristic) - a small fan or the machine's airflow counts as a measure.
-- A heatsink only helps toward something cooler. A stepper motor end cap runs 60-80 C: do not couple the driver
-  to it before measuring.
+- A heatsink only helps toward something cooler: measure a bracket, housing or motor before coupling a part to it.
 - Board measures in order of effect: EP soldered over its full area (paste window 50-60 % when vias are open),
   via array (3 x 3 at 0.3 mm / 1.1 mm pitch or 4 x 4 at 0.25 mm / 0.85 mm), ring of 10-16 GND vias just outside the
   courtyard, unbroken L2 under and around the part, opposite-side copper island, 2 oz outer copper.
-- Lower the loss before adding metal: standstill current reduction, lower run current / load-adaptive current
-  (CoolStep), supply voltage and chopper frequency no higher than needed (switching loss), derating from the
-  driver's temperature readout / warning flag.
-- Decide by measurement: worst-case current, 20-30 min soak, driver temperature readout or a thermocouple on the
-  opposite-side pad. Keep other heat sources (eFuse, regulators) >= 15 mm away and out of the heatsink area.
+- Lower the loss before adding metal: current no higher than the load needs, supply voltage and switching
+  frequency no higher than needed (switching loss), derating from the part's temperature readout / warning flag
+  where it has one.
+- Decide by measurement: worst-case current, 20-30 min soak, the part's temperature readout or a thermocouple on the
+  opposite-side pad. Keep other heat sources (eFuse, regulators) >= 15 mm away (heuristic) and out of the heatsink
+  area.
 - These provisions are placement decisions: reserve the opposite-side area as a keep-out before placing passives
   under the IC, and check after routing that the via ring and the island really exist.
+
+## Worked example: the stepper-driver board (TMC2240)
+One board's numbers, not limits (42 x 42 mm, 4-layer, 24 V; the board of `routing_review.md`):
+- Driver loss: P ~ 2 x Irms^2 x Rds(on)(HS+LS); TMC2240 0.23 ohm at 1.5 A RMS -> ~1.0 W.
+- Lowering the loss on a stepper driver: standstill current reduction, lower run current / load-adaptive current
+  (CoolStep), supply voltage and chopper frequency no higher than needed, derating from the driver's temperature
+  readout / warning flag.
+- A stepper motor end cap runs 60-80 C: do not couple the driver to it before measuring.
+- What routing left of the planned via ring and bottom pad: `routing_review.md` section 1, thermal provisions.
 
 ## Analog supply
 - Analog rail: ferrite bead + 10 uF bulk + 100 nF at each pin. Vref: 10 uF + 100 nF next to the ADC.

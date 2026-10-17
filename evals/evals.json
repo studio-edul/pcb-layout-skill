@@ -110,6 +110,39 @@
         "the project's saved clearances / net classes are read before parts are placed",
         "placement_check.py runs before any coordinate is applied"
       ]
+    },
+    {
+      "id": "two-layer-sensor-board-i2c",
+      "prompt": "2-layer, 1.6 mm sensor board: a 3.3 V MCU and six I2C sensors on one 400 kHz bus, about 120 pF in total. I copied each sensor's reference circuit, so every sensor has its own 4.7 kOhm pull-ups on SDA and SCL. Is the bus OK, and how should I use the two layers?",
+      "files": [],
+      "expected_output": "Applies B24: six 4.7 kOhm pull-ups in parallel are about 783 ohm, below Rp(min) = (3.3 - 0.4) / 3 mA = 967 ohm, so a device cannot pull the line low within spec; a single 4.7 kOhm pair is above Rp(max) = 300 ns / (0.8473 x 120 pF) = about 2.95 kOhm, so it is too slow at 400 kHz. Recommends one pull-up pair per bus with a value between those limits (e.g. 2.2 kOhm) and leaving the other footprints unpopulated. For the layers: parts, signals and power on top, the bottom kept as unbroken GND with only short hops, both pours stitched with vias.",
+      "assertions": [
+        "the parallel value (about 783 ohm) and both limits (about 967 ohm and about 2.95 kOhm) are computed with a script, not by feel",
+        "it says to fit one pull-up pair per bus instead of one per sensor, with a value between the two limits",
+        "the 2-layer advice keeps the bottom layer as an unbroken GND reference with only short hops"
+      ]
+    },
+    {
+      "id": "led-board-48v-clearance",
+      "prompt": "My 2-layer LED board runs a 48 V LED string from a constant-current buck LED driver. I use 0.15 mm clearance everywhere on both layers. Is that enough, and where does the current-sense resistor go?",
+      "files": [],
+      "expected_output": "Uses the voltage-dependent clearance rule: 48 V between conductors on uncoated outer layers is the 31-50 V row of IPC-2221 Table 6-1, column B2, 0.6 mm (still 0.6 mm in the 51-100 V row if the supply can exceed 50 V), so 0.15 mm is not enough between the 48 V nets and ground / low-voltage nets; it proposes a net class with 0.6 mm for them and keeps 0.15 mm elsewhere. The sense resistor sits at the driver's current-sense pins with Kelvin connections, away from the switch node, and the driver's switching loop follows B2 / B18.",
+      "assertions": [
+        "0.6 mm on the outer layers for the 48 V nets is given with IPC-2221 Table 6-1 (B2, external uncoated) as the source",
+        "the clearance is picked from the highest operating voltage between the conductors, and 0.15 mm stays only for low-voltage nets",
+        "the sense resistor is placed at the driver's sense pins with Kelvin connections, away from the switch node"
+      ]
+    },
+    {
+      "id": "rf-module-and-strapping-pin",
+      "prompt": "ESP32-WROOM-32E board: the module sits in the middle of the board with ground pour under all of it, antenna included, and a push button with a 10 kOhm pull-up to 3.3 V is wired to GPIO12. Anything wrong?",
+      "files": [],
+      "expected_output": "Two findings. The antenna must go to the board edge (beyond it, or the feed at the edge with the board cut away beside and below it), with the module datasheet's keep-out on all layers - no pour, parts or tracks under the antenna, not centred in a hollowed clearance (B22, Espressif hardware design guidelines). GPIO12 is the MTDI strapping pin (internal pull-down): a pull-up holding it high at reset switches VDD_SDIO, the flash supply, to the 1.8 V LDO and the module fails to boot; the button moves to a pin that is not a strapping pin (not GPIO0, 2, 5, 12, 15).",
+      "assertions": [
+        "the antenna is moved to the board edge with a keep-out on all layers per the module datasheet / Espressif guidelines",
+        "GPIO12 is identified as a strapping pin whose high level at reset selects 1.8 V for VDD_SDIO, so the boot fails",
+        "the button is moved to a pin that is not a strapping pin"
+      ]
     }
   ]
 }

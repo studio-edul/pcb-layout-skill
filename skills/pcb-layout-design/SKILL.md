@@ -2,7 +2,8 @@
 name: pcb-layout-design
 description: >-
   PCB layout design partner that checks its own work with deterministic tools. Turns block rules (decoupling,
-  buck hot loop, crystal, motor driver, eFuse, connector ESD/TVS, USB-C, CAN) into numeric near/apart limits,
+  buck / boost, crystal, motor driver, eFuse, Li-ion charger, LED, relay, op-amp, audio, RF module, Ethernet,
+  I2C, connector ESD/TVS, USB-C, CAN) into numeric near/apart limits,
   runs a placement checker before any coordinate reaches the EDA tool, sizes traces, vias and power paths by
   calculation, audits routed boards beyond DRC, and verifies the fabrication files themselves (Gerber copper
   against the IPC-D-356 netlist, silk and mask, release-to-release diff, BOM/CPL). Imports placements from
@@ -15,7 +16,7 @@ compatibility: >-
   impedance field solver in pcbcalc.py uses numpy and scipy when present; everything else is standard library. Works with any EDA tool; KiCad and EasyEDA Pro importers included.
 metadata:
   author: studio-edul
-  version: "1.1.1"
+  version: "1.2.0"
 ---
 
 # PCB layout design
@@ -32,11 +33,11 @@ Scripts (run from this skill's directory; every Python script prints `--help`):
 | `scripts/audit_release.py` | release folder / zip: required layers, Gerber / Excellon structure, BOM / CPL consistency |
 
 References (read when the task needs them):
-- `references/late_changes.md` - changing a laid-out board: what part swaps and syncs broke, `baseline_diff.py`, moving MCU signals (STM32G431)
+- `references/late_changes.md` - changing a laid-out board: what part swaps and syncs broke, `baseline_diff.py`, a pin-move checklist for any MCU (STM32G431 and ESP32 examples)
 - `references/review_release.md` - review rubric and finding format, DFM checklist, release checks, bring-up
 - `references/routing_review.md` - post-route audit beyond DRC, power-path rating table, inner planes, USB-C 16P fan-out, simulate-then-apply rework, the visual pass
-- `references/emc_protection.md` - return paths and layer changes, crosstalk spacing, signal routing, ESD / TVS / surge, filtering, isolation
-- `references/power_thermal.md` - power budget, theta_JA tables, formulas, heatsink position, analog supply
+- `references/emc_protection.md` - return paths and layer changes, crosstalk spacing, signal routing, clearance by voltage (IPC-2221), ESD / TVS / surge, filtering, isolation
+- `references/power_thermal.md` - power budget, theta_JA tables, formulas, heatsink position, analog supply, a stepper-driver worked example
 - `references/easyeda_pro_api.md` - scripted layout in EasyEDA Pro: units, rotations, pours, DRC, part swaps, traps
 - `references/jlcpcb_ordering.md` - order options, PCBA cost model, BOM / CPL upload traps (dated, re-check)
 - `references/kicad_notes.md` - KiCad exports for the tools above
@@ -106,7 +107,7 @@ service (`references/jlcpcb_ordering.md`) - report it to the user with the cost.
 - Routing corridor 3-5 mm between big ICs that exchange many signals; no parts in it.
 - Separation (edge-to-edge): crystal vs buck SW / inductor >= 15 mm, crystal vs motor outputs >= 12 mm,
   ADC / analog RC vs SW node >= 10 mm, microphone / analog sensor vs inductor >= 15 mm.
-- RF modules: antenna edge flush with / beyond the board edge, keep-out exactly per the module datasheet on all
+- RF modules (B22): antenna edge flush with / beyond the board edge, keep-out exactly per the module datasheet on all
   layers (copper, parts, holes, battery, screws). In the checker JSON the antenna area is a keep-out with
   `"allow": ["<module ref>"]` (see `assets/placement_example.json`).
 
@@ -163,13 +164,30 @@ the connector pin") - the reader does not have this table.
 | B13 | CAN / RS-485 | ESD at the connector, pair kept together; optional common-mode choke at the connector |
 | B14 | connector CC / termination resistors | <= 5 mm from the pin |
 | B15 | analog vs switching | apart >= 10-15 mm |
+| B16 | boost | output cap first, closest: the loop FET -> diode -> output cap -> GND carries the pulsed current, short wide copper (TI SLVA773); then input cap and inductor; SW copper small; FB / divider away from SW, as B2 |
+| B17 | Li-ion charger / protection | IN, OUT / SYS and BAT caps at their pins, grounded to the thermal pad (the IC's ground, vias under it); charge-sense R Kelvin, small loop; small-signal grounds off the battery current path (TI bq2408x / BQ24753A layout); protection FETs, fuse and cell tabs rated as a power path; NTC at the cell (heuristic); operating rule 8 |
+| B18 | LED driver / high-current LED | driver loop as B2 / B16; sense R at the CS pins, Kelvin, away from SW; LED thermal pad on copper + vias, heat budgeted as Vf x I (conservative) with the LED datasheet's Rth; dimming PWM apart from analog (B15) |
+| B19 | relay / solenoid / inductive load | freewheel diode (or diode + Zener) across the coil, at the coil or its connector (heuristic); a plain diode slows release and shortens contact life, diode + Zener releases faster (TE coil-suppression note); diode and driver rated for the coil current; contact tracks as a power path; mains: operating rule 8 |
+| B20 | op-amp / precision analog | decoupling at each supply pin (B1); feedback parts at the inverting pin; high-impedance inputs: guard ring on both sides at the input potential (TI LMC660); high-speed op-amps only: plane removed under the input and output pads (ADI high-speed layout guide); Kelvin sense; away from heat and SW (B15) |
+| B21 | audio (class-D, codec, mic) | class-D: decoupling at each supply pin, output bead / LC filter at the output pins with a small loop to PGND, AGND and PGND joined at the thermal pad (TI TPA3113D2 layout); beads once speaker leads exceed about 10 cm (ADI SSM-series guide); inputs away from class-D outputs and SW (B15) |
+| B22 | RF module / antenna | antenna beyond the edge or its feed at the edge, board cut away beside and below it, never centred in a hollowed clearance, dense GND vias near it, >= 15 mm to the housing all round (Espressif ESP32 HW design guidelines); keep-out per module datasheet on all layers; u.FL / chip-antenna feed 50 ohm (`pcbcalc.py microstrip`), matching pads at the feed |
+| B23 | Ethernet PHY / magnetics | MDI pairs 100 ohm diff +-10 %, < 50 mm (matching, spacing: `references/emc_protection.md`); no metal under discrete magnetics on any layer; earth ground >= 20 mil keep-out on all layers, bridged by C + >= 1 MOhm only (TI SNLA387) |
+| B24 | I2C pull-ups | one pair per bus segment, not per device (parallel pull-ups add up); Rp >= (VDD - 0.4 V) / IOL, IOL 3 mA up to 400 kHz (967 ohm at 3.3 V), 20 mA at 1 MHz; Rp <= tr / (0.8473 x Cb), tr 1000 / 300 / 120 ns at 100 k / 400 k / 1 MHz, Cb <= 400 pF up to 400 kHz (NXP UM10204); compute it with Cb counted (pins, tracks, cable) |
 
 ## 6. Routing, stackup, EMC (details: `references/emc_protection.md`)
 - 4-layer: L1 parts + signals, **L2 solid GND (no traces, no slots)**, L3 power areas, L4 slow signals + GND.
+- 2-layer: L1 parts, signals and power; L2 GND as unbroken as possible - only short hops there, at right angles to the
+  L1 tracks above; stitch both pours with vias. The plane sits ~1.5 mm below L1 on a 1.6 mm board: 50 ohm is about
+  2.8 mm wide (`pcbcalc.py microstrip`) and neighbours couple far more, so keep fast / RF lines short, order a thinner
+  board, or go 4-layer.
 - Widths from `pcbcalc.py trace-width` (5 A, 1 oz outer, 10 C rise -> 2.8 mm; 3.5 mm with margin); share high
   current between an outer trace and an inner area; via arrays from `pcbcalc.py via-current`.
-- Clearance 0.15 mm default, 0.30 mm on 24 V nets. Tracks 0 / 45 / 90 deg only (curves only where an RF design asks
-  for them; fix router / importer skew before release), no acute angles.
+- Clearance: the larger of 0.15 mm (default) and IPC-2221B Table 6-1 for the highest operating voltage between the two
+  conductors (DC or AC peak; the rail's maximum, not its nominal). Outer layers, uncoated, <= 3050 m (B2): <= 30 V
+  0.1, 31-150 V 0.6, 151-300 V 1.25, 301-500 V 2.5 mm. Inner layers, leads, coating, altitude, > 500 V: the table in
+  `references/emc_protection.md`; mains: operating rule 8.
+- Tracks 0 / 45 / 90 deg only (curves only where an RF design asks for them; fix router / importer skew before
+  release), no acute angles.
 - Vias: none under connector shells; under ICs only EP thermal vias and that IC's own pin / decoupling vias; never
   in or between fine-pitch pads; >= 0.2 mm (target) from pads of other nets.
 - Power is never left at autorouter width: draw the power stage by hand first (bars + via arrays at the pads),
@@ -182,7 +200,7 @@ the connector pin") - the reader does not have this table.
   per fast net. Two signal layers with no plane between them couple broadside: cross them, don't stack them.
 - SPI: MOSI/SCLK matched +-2 mm, series R at the source only when the waveform needs it, <= 1 via, edge gap >= 2x
   width to other signals (the 3W rule, centre to centre), never parallel to I2C / UART > 5 mm. I2C >= 10x width from
-  SPI SCLK, never parallel to PWM / STEP.
+  SPI SCLK, never parallel to PWM or other fast-edge lines.
 - Kelvin-connect sense / ADC lines; ESD current path short and wide to the plane.
 - Copper hygiene: no islands, no necks < 0.2 mm, thermal relief on pour pads (not on EPs), GND stitching along the
   edge every 5-10 mm.
